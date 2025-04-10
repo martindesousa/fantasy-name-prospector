@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Name Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px auto;
+            padding: 20px;
+            max-width: 800px;
+            line-height: 1.6;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        select, input, button {
+            padding: 8px;
+            font-size: 16px;
+            width: 100%;
+        }
+        button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .flex-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            gap: 10px;
+        }
+        .flex-container > div {
+            flex: 1;
+            min-width: 100px;
+            max-width: 180px;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .dropdown-inline {
+            display: inline-block;
+        }
+        .error-message {
+            color: red; 
+            font-size: 15px; 
+            margin-bottom: 25px; 
+            text-align: center; 
+            position: absolute;
+            top: 320px;
+            transform: translateX(70%); /* Correct centering */
+        }
+        #custom-names-container {
+            display: none;
+        }
+        #custom-notice {
+        display: none;
+        color: red;
+        font-weight: bold;
+        font-size: 12px;
+        margin-top: 5px; /* Adjust this for spacing */
+        }
+
+
+    </style>
+</head>
+<body>
+    <h1>Fantasy Name Generator</h1>
+    <!-- Main Form -->
+    <form method="POST" action="/generate" id="name-generator-form">
+        <!-- Model Selection -->
+        <div class="form-group">
+            <label for="model">Select a Model:</label>
+            <select id="model" name="model">
+                <option value="american" {% if selected_model == 'american' %}selected{% endif %}>American Names</option>
+                <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German Names</option>
+                <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French Names</option>
+                <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>Input Your Own Names</option>
+            </select>
+        </div>
+
+         <!-- Custom Names Input Field (Initially hidden) -->
+         <div id="custom-names-container" class="form-group">
+            <label for="custom_names">Enter Your Custom Names (one per line):</label>
+            <textarea id="custom_names" name="custom_names" rows="10" placeholder="Enter names here...&#10line...&#10by...&#10line..."></textarea>
+            <!-- Custom Names Notice About Long Computation-->
+            <div id="custom-notice">
+            *Note: It takes much longer to generate your custom names.
+            </div>
+        </div>
+
+        
+    
+        <!-- Temperature, Seed, and Length Options -->
+        <div class="form-group flex-container">
+            <div>
+                <label for="temperature">Temperature (randomness):</label>
+                <input type="number" id="temperfature" name="temperature" placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" 
+                value="{{ temperature if temperature is not none else 0.5 }}" required>
+            </div>
+            <div>
+                <label for="seed">Seed Text (first character(s)):</label>
+                <input type="text" id="seed" name="seed" placeholder="e.g., A" value="{{ seed }}" required>
+            </div>
+            <div>
+                <label for="length">Name Length (characters):</label>
+                <input type="number" id="length" name="length" min="1" value="{{ length }}" required>
+            </div>
+            <!-- Generate Count Dropdown -->
+            <div class="form-group dropdown-inline">
+                <label for="count">Number of Names to Generate:</label>
+                <select id="count" name="count">
+                    <option value="1" {% if count == 1 %}selected{% endif %}>1</option>
+                    <option value="5" {% if count == 5 %}selected{% endif %}>5</option>
+                    <option value="10" {% if count == 10 %}selected{% endif %}>10</option>
+                    <option value="50" {% if count == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if count == 100 %}selected{% endif %}>100</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Error Message Display -->
+        <div id="error-message" class="error-message" style="display:none;">Seed text cannot be longer than the name length.</div>
+    
+        <!-- Generate Button -->
+        <div class="form-group">
+            <button type="submit" class="submit-button">Generate</button>
+        </div>
+
+        <div id="loading" style="display:none; margin-top: 20px; text-align: center;">
+            <p id="loading-text">Preparing...</p>
+            <progress id="progress-bar" value="0" max="100" style="width: 100%; height: 20px;"></progress>
+        </div>
+    </form>
+    
+
+    <!-- Generated Names -->
+    {% if generated_names %}
+    <div class="result">
+        <h2>Generated Names:</h2>
+        <ul>
+            {% for name in generated_names %}
+                <li>{{ name }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <script>
+
+        // Main form
+        const form = document.getElementById('name-generator-form');
+
+        // References to the form fields for dynamic error message
+        const seedInput = document.getElementById('seed');
+        const lengthInput = document.getElementById('length');
+        const errorMessage = document.getElementById('error-message');
+
+        // References to loading elements
+        const loadingDiv = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const progressBar = document.getElementById('progress-bar');
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'result';
+
+        // References to the form fields for dynamic type box
+        const modelSelect = document.getElementById('model');
+        const customNamesContainer = document.getElementById('custom-names-container');
+        const customNotice = document.getElementById('custom-notice');
+
+        // Function to toggle the visibility of the custom names input field
+        modelSelect.addEventListener('change', function() {
+            if (modelSelect.value === 'custom') {
+                customNamesContainer.style.display = 'block'; // Show custom names input field
+                customNotice.style.display = 'block'; //Show custom names notice
+
+            } else {
+                customNamesContainer.style.display = 'none'; // Hide input field
+                customNotice.style.display = 'none'; //Hide custom names notice
+            }
+        });
+
+        // Trigger the change event to ensure the correct initial state (in case 'custom' is pre-selected)
+        modelSelect.dispatchEvent(new Event('change'));
+
+        // Add event listener to validate inputs when the form is submitted
+        form.addEventListener('submit', function(event) {
+            event.preventDefault(); //Prevent normal form submission
+
+            //Validate inputs
+            const seedText = seedInput.value;
+            const nameLength = parseInt(lengthInput.value);
+
+            if (seedText.length > nameLength) {
+                errorMessage.style.display = 'block'; // Show error message
+                return;
+            } else {
+                errorMessage.style.display = 'none'; // Hide error message if valid
+            }
+
+             // Show loading elements
+            loadingDiv.style.display = 'block';
+            loadingText.textContent = 'Preparing...';
+            progressBar.value = 0;
+        
+            // Remove any previous results
+            if (document.querySelector('.result')) {
+                document.querySelector('.result').remove();
+            }
+        
+            // Get form data
+            const formData = new FormData(form);
+
+            // Create fetch request to stream_progress endpoint
+            fetch('/stream_progress', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                function processStream() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) {
+                            console.log('Stream complete');
+                            return;
+                        }
+                        
+                        const text = decoder.decode(value);
+                        const lines = text.split('\n\n');
+                        
+                        lines.forEach(line => {
+                            if (line.startsWith('data:')) {
+                                try {
+                                    const jsonData = JSON.parse(line.substring(5).trim());
+                                    console.log("Received event data:", jsonData); //debug line
+
+                                    // Update loading information for ALL event types
+                                    if (jsonData.message) {
+                                        loadingText.textContent = jsonData.message;
+                                    }
+                        
+                                    if (jsonData.progress !== undefined) {
+                                        progressBar.value = jsonData.progress;
+                                    }
+                        
+                                    // Handle different event types
+                                    switch(jsonData.type) {
+                                        case 'preparing':
+                                        case 'loading':
+                                        case 'training':
+                                        case 'generating':
+                                            // Update UI for these streaming states
+                                            loadingDiv.style.display = 'block';
+                                            break;
+                                            
+                                        case 'training_complete':
+                                            loadingText.textContent = "Training complete! Starting name generation...";
+                                            break;
+                                
+                                        case 'complete':
+                                            // Hide loading elements
+                                            loadingDiv.style.display = 'none';
+                                            
+                                            // Create results display
+                                            resultDiv.innerHTML = `
+                                                <h2>Generated Names:</h2>
+                                                <ul>
+                                                    ${jsonData.names.map(name => `<li>${name}</li>`).join('')}
+                                                </ul>
+                                            `;
+                                            document.body.appendChild(resultDiv);
+                                            break;
+                                
+                                            case 'error':
+                                                loadingText.textContent = "Error: " + jsonData.message;
+                                                loadingDiv.style.display = 'block';
+                                                break;
+
+                                    }
+                                } catch (e) {
+                                    console.error('Error parsing SSE data:', e);
+                                }
+                            }
+                        });
+                        
+                        return processStream();
+                    });
+                }
+                
+                return processStream();
+            }).catch(error => {
+                console.error('Fetch error:', error);
+                loadingText.textContent = 'Error: ' + error.message;
+            });
+        });
+
+    </script>
+</body>
+</html>
