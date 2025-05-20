@@ -116,7 +116,7 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name=
     os.makedirs('models', exist_ok=True)
     
     # Save the model
-    model.save(f'models/{model_name}.keras')
+    model.save(f'app/models/{model_name}.keras')
     
     # Save data needed for generation
     data_dict = {
@@ -128,7 +128,7 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name=
         'bigram_counts': get_bigram_counts(' '.join(idx_to_char[i] for i in range(len(idx_to_char))))
     }
     
-    with open(f'models/{model_name}_data.pkl', 'wb') as file:
+    with open(f'app/models/{model_name}_data.pkl', 'wb') as file:
         pickle.dump(data_dict, file)
 
 class TrainingProgressCallback(tf.keras.callbacks.Callback):
