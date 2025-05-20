@@ -1,5 +1,5 @@
 import os
-import fng_model as fng_model
+import app.fng_model as fng_model
 
     # Main function that prompts the user for the model name and file name, then trains and saves the model
 def main():
