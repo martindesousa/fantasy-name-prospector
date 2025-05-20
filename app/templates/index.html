@@ -345,16 +345,16 @@
                 const model = modelSelect.value;
                 const customNamesText = document.getElementById('custom_names').value.trim();
 
-                if (!customNamesText) {
-                    // No names entered yet; can't check model
-                    trainButton.style.display = 'inline-block';
-                    generateButton.style.display = 'none';
-                    return;
-                }
                 if (model !== 'custom') {
                     // Always show Generate for non-custom models
                     trainButton.style.display = 'none';
                     generateButton.style.display = 'inline-block';
+                    return;
+                }
+                if (!customNamesText) {
+                    // No names entered yet; can't check model
+                    trainButton.style.display = 'inline-block';
+                    generateButton.style.display = 'none';
                     return;
                 }
 
