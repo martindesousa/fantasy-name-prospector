@@ -206,7 +206,14 @@
             } else {
                 customNamesContainer.style.display = 'none'; // Hide input field
                 customNotice.style.display = 'none'; //Hide custom names notice
+                trainButton.style.display = 'none';
+                generateButton.style.display = 'inline-block';
             }
+        });
+
+        customNamesContainer.addEventListener("input", () => {
+            document.getElementById("trainButton").style.display = "inline-block";
+            document.getElementById("generateButton").style.display = "none";
         });
 
         // Trigger the change event to ensure the correct initial state (in case 'custom' is pre-selected)
@@ -357,16 +364,8 @@
                 const model = modelSelect.value;
                 const customNamesText = document.getElementById('custom_names').value.trim();
 
-                if (model !== 'custom') {
-                    // Always show Generate for non-custom models
-                    trainButton.style.display = 'none';
-                    generateButton.style.display = 'inline-block';
-                    return;
-                }
                 if (!customNamesText) {
                     // No names entered yet; can't check model
-                    trainButton.style.display = 'inline-block';
-                    generateButton.style.display = 'none';
                     return;
                 }
 
