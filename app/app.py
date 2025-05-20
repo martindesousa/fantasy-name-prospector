@@ -77,7 +77,7 @@ def stream_progress():
             if os.path.exists(model_path):
                 # Model already trained, load and skip training
                 yield f"data: {json.dumps({'type': 'loading', 'message': 'Loading trained model...', 'progress': 5})}\n\n"
-                model, char_to_idx, idx_to_char, char_set = fng_model.load_model_data(model_name)
+                model, char_to_idx, idx_to_char, char_set = fng_name_generate.load_model_data(model_name)
 
             else:
             
