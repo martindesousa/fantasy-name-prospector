@@ -37,6 +37,13 @@
         }
         button:hover {
             background-color: #0056b3;
+        }   
+        #train-button {
+            background-color: #28a745; 
+            color: white;
+        }
+        #train-button:hover {
+            background-color: #218838; 
         }
         .flex-container {
             display: flex;
@@ -113,7 +120,7 @@
         <div class="form-group flex-container">
             <div>
                 <label for="temperature">Temperature (randomness):</label>
-                <input type="number" id="temperfature" name="temperature" placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" 
+                <input type="number" id="temperature" name="temperature" placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" 
                 value="{{ temperature if temperature is not none else 0.5 }}" required>
             </div>
             <div>
@@ -142,7 +149,8 @@
     
         <!-- Generate Button -->
         <div class="form-group">
-            <button type="submit" class="submit-button">Generate</button>
+            <button id="generate-button" button type="submit" class="submit-button">Generate</button>
+            <button id="train-button" button type="submit" class="submit-button" style="display:none;">Generate</button>
         </div>
 
         <div id="loading" style="display:none; margin-top: 20px; text-align: center;">
@@ -312,6 +320,72 @@
                 loadingText.textContent = 'Error: ' + error.message;
             });
         });
+
+        //Function for finding MD5 hash
+        async function hashCustomNames(text) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+            const hashBuffer = await crypto.subtle.digest('MD5', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return `custom_${hashHex}`;
+        }
+
+        const trainButton = document.getElementById('train-button');
+        const generateButton = document.getElementById('generate-button');
+
+        let debounceTimeout = null;
+
+        async function checkIfModelExistsDebounced() {
+            if (debounceTimeout) {
+                clearTimeout(debounceTimeout);
+            }
+
+            debounceTimeout = setTimeout(async () => {
+                const model = modelSelect.value;
+                const customNamesText = document.getElementById('custom_names').value.trim();
+
+                if (!customNamesText) {
+                    // No names entered yet; can't check model
+                    trainButton.style.display = 'inline-block';
+                    generateButton.style.display = 'none';
+                    return;
+                }
+                if (model !== 'custom') {
+                    // Always show Generate for non-custom models
+                    trainButton.style.display = 'none';
+                    generateButton.style.display = 'inline-block';
+                    return;
+                }
+
+                const hashedModelName = await hashCustomNames(customNamesText);
+
+
+                fetch('/check_model_exists?model=' + encodeURIComponent(model))
+                    .then(response => response.json())
+                    .then(data => {
+                        const modelExists = data.exists;
+
+                        if (modelExists) {
+                            trainButton.style.display = 'none';
+                            generateButton.style.display = 'inline-block';
+                        } else {
+                            generateButton.style.display = 'none';
+                            trainButton.style.display = 'inline-block';
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Error checking model:", err);
+                        // Default to Generate in error case
+                        trainButton.style.display = 'none';
+                        generateButton.style.display = 'inline-block';
+                    });
+            }, 1000);
+        }
+
+        // Run check on load and when model changes
+        modelSelect.addEventListener('change', checkIfModelExistsDebounced);
+        checkIfModelExistsDebounced();
 
     </script>
 </body>
