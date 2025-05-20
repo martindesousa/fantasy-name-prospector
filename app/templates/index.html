@@ -71,7 +71,6 @@
             font-size: 15px; 
             margin-bottom: 25px; 
             text-align: center; 
-            position: absolute;
             top: 320px;
             transform: translateX(70%); /* Correct centering */
         }
@@ -144,8 +143,11 @@
             </div>
         </div>
 
-        <!-- Error Message Display -->
+        <!-- Seed and Length Error Message Display -->
         <div id="error-message" class="error-message" style="display:none;">Seed text cannot be longer than the name length.</div>
+
+        <!-- Empty Names Field Error Message Display -->
+        <div id="error-message-2" class="error-message" style="display:none;">Custom Names field cannot be empty.</div>
     
         <!-- Generate Button -->
         <div class="form-group">
@@ -181,6 +183,7 @@
         const seedInput = document.getElementById('seed');
         const lengthInput = document.getElementById('length');
         const errorMessage = document.getElementById('error-message');
+        const errorMessage2 = document.getElementById('error-message-2');
 
         // References to loading elements
         const loadingDiv = document.getElementById('loading');
@@ -216,12 +219,21 @@
             //Validate inputs
             const seedText = seedInput.value;
             const nameLength = parseInt(lengthInput.value);
+            const customNamesText = document.getElementById('custom_names').value.trim();
 
             if (seedText.length > nameLength) {
                 errorMessage.style.display = 'block'; // Show error message
                 return;
             } else {
                 errorMessage.style.display = 'none'; // Hide error message if valid
+            }
+
+            if (modelSelect == custom && !customNamesText)
+            {
+                errorMessage2.style.display = 'block'
+                return;
+            } else {
+                errorMessage2.style.display = 'none'; // Hide error message if valid
             }
 
              // Show loading elements
