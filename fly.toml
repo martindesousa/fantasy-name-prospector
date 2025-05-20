@@ -1,7 +1,6 @@
 app = "fantasy-name-generator"
 
 [build]
-  image = "python:3.10-slim"
 
 [env]
   PORT = "8080"
