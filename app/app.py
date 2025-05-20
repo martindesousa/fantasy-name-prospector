@@ -1,8 +1,8 @@
 from flask import Flask, request, render_template, Response, stream_with_context
 import numpy as np
 import tensorflow as tf
-import app.fng_model as fng_model
-import app.fng_name_generate as fng_name_generate
+import fng_model as fng_model
+import fng_name_generate as fng_name_generate
 import json
 import time
 import threading
