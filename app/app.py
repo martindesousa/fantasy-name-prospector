@@ -34,7 +34,7 @@ def progress_callback(current_epoch, total_epochs):
 def home():
     return render_template('index.html')
 
-#Use this for checking if a model exists from the javascript
+#Javascript will use this for checking if a model exists
 @app.route('/check_model_exists')
 def check_model_exists():
     model_name = request.args.get('model')
