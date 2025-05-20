@@ -10,6 +10,8 @@ import queue
 import os
 
 app = Flask(__name__)
+application = app
+
 
 # Shared queue for progress updates
 progress_queue = queue.Queue()
