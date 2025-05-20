@@ -1,8 +1,8 @@
 from flask import Flask, request, render_template, Response, stream_with_context
 import numpy as np
 import tensorflow as tf
-import fng_model
-import fng_name_generate
+import fng_model as fng_model
+import fng_name_generate as fng_name_generate
 import json
 import time
 import threading
@@ -141,4 +141,4 @@ def generate():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True) #remove debug if not in debug

@@ -1,1 +1,0 @@
-fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name)
