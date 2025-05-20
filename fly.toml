@@ -1,0 +1,24 @@
+app = "your-app-name"
+
+[build]
+  image = "python:3.10-slim"
+
+[env]
+  PORT = "8080"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.tcp_checks]]
+    interval = 10
+    timeout = 2
+    grace_period = "5s"
