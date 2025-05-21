@@ -38,8 +38,8 @@ def home():
 @app.route('/check_model_exists')
 def check_model_exists():
     model_name = request.args.get('model')
-    model_path = os.path.join(MODEL_DIR, model_name)
-    exists = os.path.isdir(model_path)
+    model_path = os.path.join(MODEL_DIR, f"{model_name}.keras")
+    exists = os.path.isfile(model_path)
     return jsonify({'exists': exists})
 
 @app.route('/stream_progress', methods=['POST'])
