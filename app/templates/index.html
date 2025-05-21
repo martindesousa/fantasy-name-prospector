@@ -67,12 +67,14 @@
             display: inline-block;
         }
         .error-message {
-            color: red; 
+            position: absolute;
+            min-height: 1.5em; /* reserve vertical space */
+            color: red;
+            visibility: hidden; /* hide but keep space */
             font-size: 15px; 
-            margin-bottom: 25px; 
             text-align: center; 
-            top: 320px;
             transform: translateX(70%); /* Correct centering */
+            
         }
         #custom-names-container {
             display: none;
@@ -87,6 +89,7 @@
 
 
     </style>
+
 </head>
 <body>
     <h1>Fantasy Name Generator</h1>
@@ -143,17 +146,19 @@
             </div>
         </div>
 
-        <!-- Seed and Length Error Message Display -->
-        <div id="error-message" class="error-message" style="display:none;">Seed text cannot be longer than the name length.</div>
-
-        <!-- Empty Names Field Error Message Display -->
-        <div id="error-message-2" class="error-message" style="display:none;">Custom Names field cannot be empty.</div>
     
-        <!-- Generate Button -->
-        <div class="form-group">
-            <button id="generate-button" button type="submit" class="submit-button">Generate</button>
-            <button id="train-button" button type="submit" class="submit-button" style="display:none;">Train</button>
+        <!-- Execution Button with Error Messages -->
+        <div class="button-container">
+            <!-- Seed and Length Error Message Display -->
+            <div id="error-message" class="error-message" style="display:none; min-height:1.5em;">Seed text cannot be longer than the name length.</div>
+            <!-- Empty Names Field Error Message Display -->
+            <div id="error-message-2" class="error-message" style="display:none; min-height:1.5em;">Custom Names field cannot be empty.</div>
+            <div class="form-group">
+                <button id="generate-button" button type="submit" class="submit-button">Generate</button>
+                <button id="train-button" button type="submit" class="submit-button" style="display:none;">Train</button>
+            </div>
         </div>
+
 
         <div id="loading" style="display:none; margin-top: 20px; text-align: center;">
             <p id="loading-text">Preparing...</p>
@@ -173,6 +178,8 @@
         </ul>
     </div>
     {% endif %}
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.19.0/js/md5.min.js"></script>
 
     <script>
 
@@ -196,6 +203,9 @@
         const modelSelect = document.getElementById('model');
         const customNamesContainer = document.getElementById('custom-names-container');
         const customNotice = document.getElementById('custom-notice');
+
+        const trainButton = document.getElementById('train-button');
+        const generateButton = document.getElementById('generate-button');
 
         // Function to toggle the visibility of the custom names input field
         modelSelect.addEventListener('change', function() {
@@ -235,9 +245,8 @@
                 errorMessage.style.display = 'none'; // Hide error message if valid
             }
 
-            if (modelSelect.value === custom && !customNamesText)
-            {
-                errorMessage2.style.display = 'block'
+            if (modelSelect.value === 'custom' && customNamesText === "") {
+                errorMessage2.style.display = 'block';
                 return;
             } else {
                 errorMessage2.style.display = 'none'; // Hide error message if valid
@@ -341,26 +350,20 @@
         });
 
         //Function for finding MD5 hash
-        async function hashCustomNames(text) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(text);
-            const hashBuffer = await crypto.subtle.digest('MD5', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        function hashCustomNames(text) {
+            const hashHex = md5(text);
             return `custom_${hashHex}`;
         }
 
-        const trainButton = document.getElementById('train-button');
-        const generateButton = document.getElementById('generate-button');
-
         let debounceTimeout = null;
 
-        async function checkIfModelExistsDebounced() {
+        function checkIfModelExistsDebounced() {
+            console.log("Running check for model existence");
             if (debounceTimeout) {
                 clearTimeout(debounceTimeout);
             }
 
-            debounceTimeout = setTimeout(async () => {
+            debounceTimeout = setTimeout(() => {
                 const model = modelSelect.value;
                 const customNamesText = document.getElementById('custom_names').value.trim();
 
@@ -369,10 +372,11 @@
                     return;
                 }
 
-                const hashedModelName = await hashCustomNames(customNamesText);
+                const hashedModelName = hashCustomNames(customNamesText);
 
+                console.log("Expected model filename:", hashedModelName);  // <-- Debug print
 
-                fetch('/check_model_exists?model=' + encodeURIComponent(model))
+                fetch('/check_model_exists?model=' + encodeURIComponent(hashedModelName))
                     .then(response => response.json())
                     .then(data => {
                         const modelExists = data.exists;
@@ -391,11 +395,12 @@
                         trainButton.style.display = 'none';
                         generateButton.style.display = 'inline-block';
                     });
-            }, 1000);
+            }, 500);
         }
 
         // Run check on load and when model changes
-        modelSelect.addEventListener('change', checkIfModelExistsDebounced);
+        customNamesText = document.getElementById('custom_names');
+        customNamesText.addEventListener('change', checkIfModelExistsDebounced);
         checkIfModelExistsDebounced();
 
     </script>
