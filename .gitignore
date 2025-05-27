@@ -18,6 +18,6 @@ namegen_venv/
 Thumbs.db
 
 # Custom models
-models/custom/*
-!models/custom/.gitkeep
+app/models/custom/*
+!app/models/custom/.gitkeep
 
