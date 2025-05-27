@@ -11,6 +11,7 @@ import os
 import hashlib
 
 MODEL_DIR = 'app/models'
+CUSTOM_MODEL_DIR = 'app/models/custom'
 
 app = Flask(__name__)
 application = app
@@ -34,11 +35,11 @@ def progress_callback(current_epoch, total_epochs):
 def home():
     return render_template('index.html')
 
-#Javascript will use this for checking if a model exists
+#Javascript will use this for checking if a custom model exists
 @app.route('/check_model_exists')
 def check_model_exists():
     model_name = request.args.get('model')
-    model_path = os.path.join(MODEL_DIR, f"{model_name}.keras")
+    model_path = os.path.join(CUSTOM_MODEL_DIR, f"{model_name}.keras")
     exists = os.path.isfile(model_path)
     return jsonify({'exists': exists})
 
@@ -72,11 +73,12 @@ def stream_progress():
             
             model_hash = hash_names(custom_names)
             model_name = f"custom_{model_hash}"
-            model_path = os.path.join(MODEL_DIR, f"{model_name}.keras")
+            model_path = os.path.join(CUSTOM_MODEL_DIR, f"{model_name}.keras")
 
             if os.path.exists(model_path):
                 # Model already trained, load and skip training
                 yield f"data: {json.dumps({'type': 'loading', 'message': 'Loading trained model...', 'progress': 5})}\n\n"
+                
                 model, *_ = fng_name_generate.load_model_data(model_name)
 
             else:
@@ -141,13 +143,16 @@ def stream_progress():
                     except queue.Empty:
                         # No update within timeout, send heartbeat
                         yield f"data: {json.dumps({'type': 'heartbeat', 'message': 'Setting up model...'})}\n\n"
+
+        else:
+            model_name = selected_model
         
         # Reset progress for name generation
         yield f"data: {json.dumps({'type': 'generating', 'message': 'Starting name generation...', 'progress': 0})}\n\n"
 
         # Generate names 
         name_stream = fng_name_generate.generate_quality_names_stream(
-            model_name=selected_model,
+            model_name=model_name,
             count=count,
             seed_text=seed,
             length=length,

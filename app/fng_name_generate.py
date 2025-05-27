@@ -4,9 +4,16 @@ import pickle
 from collections import Counter
 
 def load_model_data(model_name='my_model'):
-    model = tf.keras.models.load_model(f'app/models/{model_name}.keras')
-    
-    with open(f'app/models/{model_name}_data.pkl', 'rb') as file:
+    if model_name.startswith('custom'):
+        model_path = f'app/models/custom/{model_name}.keras'
+        data_path = f'app/models/custom/{model_name}_data.pkl'
+    else:
+        model_path = f'app/models/{model_name}.keras'
+        data_path = f'app/models/{model_name}_data.pkl'
+
+    model = tf.keras.models.load_model(model_path)
+
+    with open(data_path, 'rb') as file:
         data_dict = pickle.load(file)
     
     X = data_dict['X']
