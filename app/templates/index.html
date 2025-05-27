@@ -203,30 +203,56 @@
         const modelSelect = document.getElementById('model');
         const customNamesContainer = document.getElementById('custom-names-container');
         const customNotice = document.getElementById('custom-notice');
+        const customNamesText = document.getElementById('custom_names');
 
         const trainButton = document.getElementById('train-button');
         const generateButton = document.getElementById('generate-button');
 
-        // Function to toggle the visibility of the custom names input field
-        modelSelect.addEventListener('change', function() {
-            if (modelSelect.value === 'custom') {
-                customNamesContainer.style.display = 'block'; // Show custom names input field
-                customNotice.style.display = 'block'; //Show custom names notice
+        // Track the last custom text that was successfully trained
+        let lastTrainedCustomText = '';
 
+        // Function to update button visibility based on model and training status
+        function updateButtonVisibility() {
+            if (modelSelect.value === 'custom') {
+                const currentCustomText = customNamesText.value.trim();
+                
+                if (!currentCustomText) {
+                    // No text entered, show train (disabled state could be added)
+                    trainButton.style.display = 'inline-block';
+                    generateButton.style.display = 'none';
+                } else if (currentCustomText === lastTrainedCustomText && lastTrainedCustomText !== '') {
+                    // Same text as last trained, show generate
+                    trainButton.style.display = 'none';
+                    generateButton.style.display = 'inline-block';
+                } else {
+                    // Different text, need to check if model exists or show train
+                    checkIfModelExistsDebounced();
+                }
             } else {
-                customNamesContainer.style.display = 'none'; // Hide input field
-                customNotice.style.display = 'none'; //Hide custom names notice
+                // Non-custom model selected, always show generate
                 trainButton.style.display = 'none';
                 generateButton.style.display = 'inline-block';
             }
+        }
+
+        // Function to toggle the visibility of the custom names input field
+        modelSelect.addEventListener('change', function() {
+            if (modelSelect.value === 'custom') {
+                customNamesContainer.style.display = 'block';
+                customNotice.style.display = 'block';
+            } else {
+                customNamesContainer.style.display = 'none';
+                customNotice.style.display = 'none';
+            }
+            updateButtonVisibility();
         });
 
-        customNamesContainer.addEventListener("input", () => {
-            document.getElementById("train-button").style.display = "inline-block";
-            document.getElementById("generate-button").style.display = "none";
+        // Listen for changes in custom names text
+        customNamesText.addEventListener('input', function() {
+            updateButtonVisibility();
         });
 
-        // Trigger the change event to ensure the correct initial state (in case 'custom' is pre-selected)
+        // Trigger the change event to ensure the correct initial state
         modelSelect.dispatchEvent(new Event('change'));
 
         // Add event listener to validate inputs when the form is submitted
@@ -236,7 +262,7 @@
             //Validate inputs
             const seedText = seedInput.value;
             const nameLength = parseInt(lengthInput.value);
-            const customNamesText = document.getElementById('custom_names').value.trim();
+            const customNamesTextValue = customNamesText.value.trim();
 
             if (seedText.length > nameLength) {
                 errorMessage.style.display = 'block'; // Show error message
@@ -245,7 +271,7 @@
                 errorMessage.style.display = 'none'; // Hide error message if valid
             }
 
-            if (modelSelect.value === 'custom' && customNamesText === "") {
+            if (modelSelect.value === 'custom' && customNamesTextValue === "") {
                 errorMessage2.style.display = 'block';
                 return;
             } else {
@@ -310,6 +336,12 @@
                                             
                                         case 'training_complete':
                                             loadingText.textContent = "Training complete! Starting name generation...";
+                                            // Update the last trained text and switch button
+                                            if (modelSelect.value === 'custom') {
+                                                lastTrainedCustomText = customNamesText.value.trim();
+                                                trainButton.style.display = 'none';
+                                                generateButton.style.display = 'inline-block';
+                                            }
                                             break;
                                 
                                         case 'complete':
@@ -324,6 +356,12 @@
                                                 </ul>
                                             `;
                                             document.body.appendChild(resultDiv);
+                                            
+                                            // If this was a training + generation cycle, update the trained text
+                                            if (modelSelect.value === 'custom' && trainButton.style.display !== 'none') {
+                                                lastTrainedCustomText = customNamesText.value.trim();
+                                                updateButtonVisibility();
+                                            }
                                             break;
                                 
                                             case 'error':
@@ -365,14 +403,14 @@
 
             debounceTimeout = setTimeout(() => {
                 const model = modelSelect.value;
-                const customNamesText = document.getElementById('custom_names').value.trim();
+                const customNamesTextValue = customNamesText.value.trim();
 
-                if (!customNamesText) {
-                    // No names entered yet; can't check model
+                if (model !== 'custom' || !customNamesTextValue) {
+                    // Not custom model or no names entered yet
                     return;
                 }
 
-                const hashedModelName = hashCustomNames(customNamesText);
+                const hashedModelName = hashCustomNames(customNamesTextValue);
 
                 console.log("Expected model filename:", hashedModelName);  // <-- Debug print
 
@@ -382,25 +420,24 @@
                         const modelExists = data.exists;
 
                         if (modelExists) {
+                            lastTrainedCustomText = customNamesTextValue; // Mark as trained
                             trainButton.style.display = 'none';
                             generateButton.style.display = 'inline-block';
                         } else {
-                            generateButton.style.display = 'none';
                             trainButton.style.display = 'inline-block';
+                            generateButton.style.display = 'none';
                         }
                     })
                     .catch(err => {
                         console.error("Error checking model:", err);
-                        // Default to Generate in error case
-                        trainButton.style.display = 'none';
-                        generateButton.style.display = 'inline-block';
+                        // Default to Train in error case for custom models
+                        trainButton.style.display = 'inline-block';
+                        generateButton.style.display = 'none';
                     });
             }, 500);
         }
 
-        // Run check on load and when model changes
-        customNamesText = document.getElementById('custom_names');
-        customNamesText.addEventListener('change', checkIfModelExistsDebounced);
+        // Run initial check
         checkIfModelExistsDebounced();
 
     </script>
