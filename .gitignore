@@ -16,3 +16,8 @@ namegen_venv/
 
 # Windows system files
 Thumbs.db
+
+# Custom models
+app/models/custom/*
+!app/models/custom/.gitkeep
+

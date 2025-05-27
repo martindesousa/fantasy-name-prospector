@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, Response, stream_with_context
+from flask import Flask, request, render_template, Response, stream_with_context, jsonify
 import numpy as np
 import tensorflow as tf
 import app.fng_model as fng_model
@@ -8,6 +8,10 @@ import time
 import threading
 import queue
 import os
+import hashlib
+
+MODEL_DIR = 'app/models'
+CUSTOM_MODEL_DIR = 'app/models/custom'
 
 app = Flask(__name__)
 application = app
@@ -31,6 +35,14 @@ def progress_callback(current_epoch, total_epochs):
 def home():
     return render_template('index.html')
 
+#Javascript will use this for checking if a custom model exists
+@app.route('/check_model_exists')
+def check_model_exists():
+    model_name = request.args.get('model')
+    model_path = os.path.join(CUSTOM_MODEL_DIR, f"{model_name}.keras")
+    exists = os.path.isfile(model_path)
+    return jsonify({'exists': exists})
+
 @app.route('/stream_progress', methods=['POST'])
 def stream_progress():
     """Stream progress updates for model training and name generation"""
@@ -40,7 +52,7 @@ def stream_progress():
         temperature = float(request.form['temperature'])
         seed = request.form['seed']
         length = int(request.form['length'])
-        epochs = 100
+        epochs = 50
         
         # Clear any old messages from the queue
         while not progress_queue.empty():
@@ -51,76 +63,96 @@ def stream_progress():
         
         # If custom model, train it in a separate thread
         if selected_model == 'custom':
+
             # Get custom names from the form
             custom_names = request.form['custom_names'].splitlines()
-            
-            # Send message about loading custom names
-            yield f"data: {json.dumps({'type': 'loading', 'message': 'Loading and processing your custom names...', 'progress': 5})}\n\n"
-            time.sleep(0.5)
-            
-            # Load data and create model
-            X, y, char_to_idx, idx_to_char, char_set, bigram_counts = fng_model.load_data(input_text="\n".join(custom_names))
-            model = fng_model.create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts)
 
-            # Training is about to start message
-            yield f"data: {json.dumps({'type': 'training', 'message': 'Starting model training...', 'progress': 10})}\n\n"
-            time.sleep(0.5)
+            def hash_names(custom_names):
+                joined = "\n".join(custom_names)
+                return hashlib.md5(joined.encode('utf-8')).hexdigest()
+            
+            model_hash = hash_names(custom_names)
+            model_name = f"custom_{model_hash}"
+            model_path = os.path.join(CUSTOM_MODEL_DIR, f"{model_name}.keras")
 
-            # Create a thread for model training
-            callback = fng_model.TrainingProgressCallback(total_epochs=epochs, stream_progress=progress_callback)
-            
-            def train_thread():
-                try:
-                    fng_model.train_model(X, y, model, epochs=epochs, batch_size=64, stream_progress=progress_callback)
-                    fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name='custom')
-                    # Put a completion message in the queue
-                    progress_queue.put({'epoch': epochs, 'total': epochs, 'complete': True})
-                except Exception as e:
-                    print(f"Error in training: {e}")
-                    progress_queue.put({'error': str(e)})
-            
-            # Start training thread
-            threading.Thread(target=train_thread).start()
+            if os.path.exists(model_path):
+                # Model already trained, load and skip training
+                yield f"data: {json.dumps({'type': 'loading', 'message': 'Loading trained model...', 'progress': 5})}\n\n"
+                
+                model, *_ = fng_name_generate.load_model_data(model_name)
 
-            # Stream progress updates for epochs, similar to name generation
-            epoch_updates = []
-            training_complete = False
+            else:
             
-            # Similar to your name generation loop
-            while not training_complete:
-                try:
-                    update = progress_queue.get(timeout=0.5)
-                    
-                    # Check if there was an error
-                    if 'error' in update:
-                        error_msg = f"Error during training: {update['error']}"
-                        yield f"data: {json.dumps({'type': 'error', 'message': error_msg, 'progress': 0})}\n\n"
-                        break
+                # Send message about loading custom names
+                yield f"data: {json.dumps({'type': 'loading', 'message': 'Loading and processing your custom names...', 'progress': 5})}\n\n"
+                time.sleep(0.5)
+            
+                # Load data and create model
+                X, y, char_to_idx, idx_to_char, char_set, bigram_counts = fng_model.load_data(input_text="\n".join(custom_names))
+                model = fng_model.create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts)
+
+                # Training is about to start message
+                yield f"data: {json.dumps({'type': 'training', 'message': 'Starting model training...', 'progress': 10})}\n\n"
+                time.sleep(0.5)
+
+                # Create a thread for model training
+                callback = fng_model.TrainingProgressCallback(total_epochs=epochs, stream_progress=progress_callback)
+            
+                def train_thread():
+                    try:
+                        fng_model.train_model(X, y, model, epochs=epochs, batch_size=64, stream_progress=progress_callback)
+                        fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name=model_name)
+                        # Put a completion message in the queue
+                        progress_queue.put({'epoch': epochs, 'total': epochs, 'complete': True})
+                    except Exception as e:
+                        print(f"Error in training: {e}")
+                        progress_queue.put({'error': str(e)})
+                
+                # Start training thread
+                threading.Thread(target=train_thread).start()
+
+                # Stream progress updates for epochs
+                epoch_updates = []
+                training_complete = False
+                
+                # Loop for status updates
+                while not training_complete:
+                    try:
+                        update = progress_queue.get(timeout=0.5)
                         
-                    # Check if training is complete
-                    if update.get('complete', False):
-                        training_complete = True
-                        yield f"data: {json.dumps({'type': 'training', 'message': 'Training complete!', 'progress': 100})}\n\n"
-                        break
+                        # Check if there was an error
+                        if 'error' in update:
+                            error_msg = f"Error during training: {update['error']}"
+                            yield f"data: {json.dumps({'type': 'error', 'message': error_msg, 'progress': 0})}\n\n"
+                            break
+                            
+                        # Check if training is complete
+                        if update.get('complete', False):
+                            training_complete = True
+                            yield f"data: {json.dumps({'type': 'training', 'message': 'Training complete!', 'progress': 100})}\n\n"
+                            break
+                            
+                        # Process regular epoch update
+                        current_epoch = update['epoch']
+                        total_epochs = update['total']
+                        progress = int((current_epoch / total_epochs) * 100)
                         
-                    # Process regular epoch update
-                    current_epoch = update['epoch']
-                    total_epochs = update['total']
-                    progress = int((current_epoch / total_epochs) * 100)
-                    
-                    # Stream this epoch update, just like you do with names
-                    yield f"data: {json.dumps({'type': 'training', 'message': f'Training model (Epoch {current_epoch}/{total_epochs})', 'progress': progress})}\n\n"
-            
-                except queue.Empty:
-                    # No update within timeout, send heartbeat
-                    yield f"data: {json.dumps({'type': 'heartbeat', 'message': 'Setting up model...'})}\n\n"
+                        # Stream this epoch update, just like you do with names
+                        yield f"data: {json.dumps({'type': 'training', 'message': f'Training model (Epoch {current_epoch}/{total_epochs})', 'progress': progress})}\n\n"
+                
+                    except queue.Empty:
+                        # No update within timeout, send heartbeat
+                        yield f"data: {json.dumps({'type': 'heartbeat', 'message': 'Setting up model...'})}\n\n"
+
+        else:
+            model_name = selected_model
         
         # Reset progress for name generation
         yield f"data: {json.dumps({'type': 'generating', 'message': 'Starting name generation...', 'progress': 0})}\n\n"
 
         # Generate names 
         name_stream = fng_name_generate.generate_quality_names_stream(
-            model_name=selected_model,
+            model_name=model_name,
             count=count,
             seed_text=seed,
             length=length,

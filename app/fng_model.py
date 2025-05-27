@@ -112,23 +112,27 @@ def train_model(X, y, model, epochs=100, batch_size=64, stream_progress=None):
     )
 
 def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name='my_model'):
-    # Create models directory if it doesn't exist
-    os.makedirs('models', exist_ok=True)
+    # Determine save path
+    base_dir = os.path.join('app', 'models', 'custom' if model_name.startswith('custom') else '')
+    os.makedirs(base_dir, exist_ok=True)
     
+    path = os.path.join(base_dir, model_name)
+
     # Save the model
-    model.save(f'app/models/{model_name}.keras')
-    
-    # Save data needed for generation
+    model.save(path + '.keras')
+
+    # Prepare and save additional data
+    bigram_input = ' '.join(idx_to_char[i] for i in range(len(idx_to_char)))  # Assuming intentional
     data_dict = {
         'X': X,
         'y': y,
         'char_to_idx': char_to_idx,
         'idx_to_char': idx_to_char,
         'char_set': char_set,
-        'bigram_counts': get_bigram_counts(' '.join(idx_to_char[i] for i in range(len(idx_to_char))))
+        'bigram_counts': get_bigram_counts(bigram_input)
     }
-    
-    with open(f'app/models/{model_name}_data.pkl', 'wb') as file:
+
+    with open(path + '_data.pkl', 'wb') as file:
         pickle.dump(data_dict, file)
 
 class TrainingProgressCallback(tf.keras.callbacks.Callback):

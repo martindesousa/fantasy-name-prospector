@@ -37,6 +37,13 @@
         }
         button:hover {
             background-color: #0056b3;
+        }   
+        #train-button {
+            background-color: #28a745; 
+            color: white;
+        }
+        #train-button:hover {
+            background-color: #218838; 
         }
         .flex-container {
             display: flex;
@@ -49,6 +56,16 @@
             min-width: 100px;
             max-width: 180px;
         }
+        #train-button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        #generate-button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
         .result {
             margin-top: 30px;
             padding: 10px;
@@ -60,13 +77,14 @@
             display: inline-block;
         }
         .error-message {
-            color: red; 
-            font-size: 15px; 
-            margin-bottom: 25px; 
-            text-align: center; 
             position: absolute;
-            top: 320px;
+            min-height: 1.5em; /* reserve vertical space */
+            color: red;
+            visibility: hidden; /* hide but keep space */
+            font-size: 15px; 
+            text-align: center; 
             transform: translateX(70%); /* Correct centering */
+            
         }
         #custom-names-container {
             display: none;
@@ -81,6 +99,7 @@
 
 
     </style>
+
 </head>
 <body>
     <h1>Fantasy Name Generator</h1>
@@ -113,7 +132,7 @@
         <div class="form-group flex-container">
             <div>
                 <label for="temperature">Temperature (randomness):</label>
-                <input type="number" id="temperfature" name="temperature" placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" 
+                <input type="number" id="temperature" name="temperature" placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" 
                 value="{{ temperature if temperature is not none else 0.5 }}" required>
             </div>
             <div>
@@ -137,13 +156,19 @@
             </div>
         </div>
 
-        <!-- Error Message Display -->
-        <div id="error-message" class="error-message" style="display:none;">Seed text cannot be longer than the name length.</div>
     
-        <!-- Generate Button -->
-        <div class="form-group">
-            <button type="submit" class="submit-button">Generate</button>
+        <!-- Execution Button with Error Messages -->
+        <div class="button-container">
+            <!-- Seed and Length Error Message Display -->
+            <div id="error-message" class="error-message" style="display:none; min-height:1.5em;">Seed text cannot be longer than the name length.</div>
+            <!-- Empty Names Field Error Message Display -->
+            <div id="error-message-2" class="error-message" style="display:none; min-height:1.5em;">Custom Names field cannot be empty.</div>
+            <div class="form-group">
+                <button id="generate-button" button type="submit" class="submit-button">Generate</button>
+                <button id="train-button" button type="submit" class="submit-button" style="display:none;">Train</button>
+            </div>
         </div>
+
 
         <div id="loading" style="display:none; margin-top: 20px; text-align: center;">
             <p id="loading-text">Preparing...</p>
@@ -164,6 +189,8 @@
     </div>
     {% endif %}
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.19.0/js/md5.min.js"></script>
+
     <script>
 
         // Main form
@@ -173,6 +200,7 @@
         const seedInput = document.getElementById('seed');
         const lengthInput = document.getElementById('length');
         const errorMessage = document.getElementById('error-message');
+        const errorMessage2 = document.getElementById('error-message-2');
 
         // References to loading elements
         const loadingDiv = document.getElementById('loading');
@@ -185,20 +213,60 @@
         const modelSelect = document.getElementById('model');
         const customNamesContainer = document.getElementById('custom-names-container');
         const customNotice = document.getElementById('custom-notice');
+        const customNamesText = document.getElementById('custom_names');
+
+        const trainButton = document.getElementById('train-button');
+        const generateButton = document.getElementById('generate-button');
+
+        // Track the last custom text that was successfully trained
+        let lastTrainedCustomText = '';
+
+        // Function to update button visibility based on model and training status
+        function updateButtonVisibility() {
+            if (modelSelect.value === 'custom') {
+                const currentCustomText = customNamesText.value.trim();
+                
+                if (!currentCustomText) {
+                    // No text entered, show disabled train button
+                    trainButton.style.display = 'inline-block';
+                    trainButton.disabled = true;
+                    generateButton.style.display = 'none';
+                } else if (currentCustomText === lastTrainedCustomText && lastTrainedCustomText !== '') {
+                    // Same text as last trained, show generate
+                    trainButton.style.display = 'none';
+                    generateButton.style.display = 'inline-block';
+                    generateButton.disabled = false;
+                } else {
+                    // Different text, need to check if model exists or show train
+                    trainButton.disabled = false; // Enable train button for valid text
+                    checkIfModelExistsDebounced();
+                }
+            } else {
+                // Non-custom model selected, always show generate
+                trainButton.style.display = 'none';
+                generateButton.style.display = 'inline-block';
+                generateButton.disabled = false;
+            }
+        }
 
         // Function to toggle the visibility of the custom names input field
         modelSelect.addEventListener('change', function() {
             if (modelSelect.value === 'custom') {
-                customNamesContainer.style.display = 'block'; // Show custom names input field
-                customNotice.style.display = 'block'; //Show custom names notice
-
+                customNamesContainer.style.display = 'block';
+                customNotice.style.display = 'block';
             } else {
-                customNamesContainer.style.display = 'none'; // Hide input field
-                customNotice.style.display = 'none'; //Hide custom names notice
+                customNamesContainer.style.display = 'none';
+                customNotice.style.display = 'none';
             }
+            updateButtonVisibility();
         });
 
-        // Trigger the change event to ensure the correct initial state (in case 'custom' is pre-selected)
+        // Listen for changes in custom names text
+        customNamesText.addEventListener('input', function() {
+            updateButtonVisibility();
+        });
+
+        // Trigger the change event to ensure the correct initial state
         modelSelect.dispatchEvent(new Event('change'));
 
         // Add event listener to validate inputs when the form is submitted
@@ -208,12 +276,20 @@
             //Validate inputs
             const seedText = seedInput.value;
             const nameLength = parseInt(lengthInput.value);
+            const customNamesTextValue = customNamesText.value.trim();
 
             if (seedText.length > nameLength) {
                 errorMessage.style.display = 'block'; // Show error message
                 return;
             } else {
                 errorMessage.style.display = 'none'; // Hide error message if valid
+            }
+
+            if (modelSelect.value === 'custom' && customNamesTextValue === "") {
+                errorMessage2.style.display = 'block';
+                return;
+            } else {
+                errorMessage2.style.display = 'none'; // Hide error message if valid
             }
 
              // Show loading elements
@@ -274,6 +350,12 @@
                                             
                                         case 'training_complete':
                                             loadingText.textContent = "Training complete! Starting name generation...";
+                                            // Update the last trained text and switch button
+                                            if (modelSelect.value === 'custom') {
+                                                lastTrainedCustomText = customNamesText.value.trim();
+                                                trainButton.style.display = 'none';
+                                                generateButton.style.display = 'inline-block';
+                                            }
                                             break;
                                 
                                         case 'complete':
@@ -288,6 +370,12 @@
                                                 </ul>
                                             `;
                                             document.body.appendChild(resultDiv);
+                                            
+                                            // If this was a training + generation cycle, update the trained text
+                                            if (modelSelect.value === 'custom' && trainButton.style.display !== 'none') {
+                                                lastTrainedCustomText = customNamesText.value.trim();
+                                                updateButtonVisibility();
+                                            }
                                             break;
                                 
                                             case 'error':
@@ -312,6 +400,59 @@
                 loadingText.textContent = 'Error: ' + error.message;
             });
         });
+
+        //Function for finding MD5 hash
+        function hashCustomNames(text) {
+            const hashHex = md5(text);
+            return `custom_${hashHex}`;
+        }
+
+        let debounceTimeout = null;
+
+        function checkIfModelExistsDebounced() {
+            console.log("Running check for model existence");
+            if (debounceTimeout) {
+                clearTimeout(debounceTimeout);
+            }
+
+            debounceTimeout = setTimeout(() => {
+                const model = modelSelect.value;
+                const customNamesTextValue = customNamesText.value.trim();
+
+                if (model !== 'custom' || !customNamesTextValue) {
+                    // Not custom model or no names entered yet
+                    return;
+                }
+
+                const hashedModelName = hashCustomNames(customNamesTextValue);
+
+                console.log("Expected model filename:", hashedModelName);  // <-- Debug print
+
+                fetch('/check_model_exists?model=' + encodeURIComponent(hashedModelName))
+                    .then(response => response.json())
+                    .then(data => {
+                        const modelExists = data.exists;
+
+                        if (modelExists) {
+                            lastTrainedCustomText = customNamesTextValue; // Mark as trained
+                            trainButton.style.display = 'none';
+                            generateButton.style.display = 'inline-block';
+                        } else {
+                            trainButton.style.display = 'inline-block';
+                            generateButton.style.display = 'none';
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Error checking model:", err);
+                        // Default to Train in error case for custom models
+                        trainButton.style.display = 'inline-block';
+                        generateButton.style.display = 'none';
+                    });
+            }, 500);
+        }
+
+        // Run initial check
+        checkIfModelExistsDebounced();
 
     </script>
 </body>
