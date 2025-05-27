@@ -21,6 +21,3 @@ Thumbs.db
 models/custom/*
 !models/custom/.gitkeep
 
-
-
-app/models/custom_52afc29f94f3da5375a63fbf0cdcad40_data.pkl
