@@ -56,6 +56,16 @@
             min-width: 100px;
             max-width: 180px;
         }
+        #train-button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        #generate-button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
         .result {
             margin-top: 30px;
             padding: 10px;
@@ -217,21 +227,25 @@
                 const currentCustomText = customNamesText.value.trim();
                 
                 if (!currentCustomText) {
-                    // No text entered, show train (disabled state could be added)
+                    // No text entered, show disabled train button
                     trainButton.style.display = 'inline-block';
+                    trainButton.disabled = true;
                     generateButton.style.display = 'none';
                 } else if (currentCustomText === lastTrainedCustomText && lastTrainedCustomText !== '') {
                     // Same text as last trained, show generate
                     trainButton.style.display = 'none';
                     generateButton.style.display = 'inline-block';
+                    generateButton.disabled = false;
                 } else {
                     // Different text, need to check if model exists or show train
+                    trainButton.disabled = false; // Enable train button for valid text
                     checkIfModelExistsDebounced();
                 }
             } else {
                 // Non-custom model selected, always show generate
                 trainButton.style.display = 'none';
                 generateButton.style.display = 'inline-block';
+                generateButton.disabled = false;
             }
         }
 
