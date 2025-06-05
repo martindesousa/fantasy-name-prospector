@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import pickle
+import time
 from collections import Counter
 
 def load_model_data(model_name='my_model'):
@@ -26,20 +27,20 @@ def load_model_data(model_name='my_model'):
     return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts
 
 def generate_quality_names_stream(model_name, count=10, seed_text='', length=7, temperature=1.0, min_bigram_count=2):
-    """Generator that yields names one-by-one with guaranteed length and optional bigram filtering."""
+    """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
     model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts = load_model_data(model_name)
 
-    generated_count = 0
+    generated_names = set()
     attempts = 0
-    max_attempts = count * 3
+    max_attempts = count * 10  # More attempts in case of many near-duplicates
 
-    while generated_count < count and attempts < max_attempts:
+    while len(generated_names) < count and attempts < max_attempts:
+        attempts += 1
         seed = seed_text if seed_text else np.random.choice(list(char_to_idx.keys())).upper()
-        
         name = seed
+
         for _ in range(length - len(seed)):
             encoded = [char_to_idx[c] for c in name if c in char_to_idx]
-            #If there was not already something added 
             if not encoded:
                 encoded = [char_to_idx[np.random.choice(list(char_to_idx.keys()))]]
             encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
@@ -65,8 +66,10 @@ def generate_quality_names_stream(model_name, count=10, seed_text='', length=7, 
 
             name += idx_to_char[predicted_index]
 
-        generated_count += 1
-        yield name
+        if name not in generated_names:
+            generated_names.add(name)
+            yield name
+        # else silently retry
 
 # def generate_quality_names(model_name, count=10, seed_text='', length=7, temperature=1.0, min_bigram_count=2):
 #     """Generate names of fixed length, optionally using a seed or random char, filtered by quality if needed."""
