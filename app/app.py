@@ -85,7 +85,7 @@ def stream_progress():
             
                 # Send message about loading custom names
                 yield f"data: {json.dumps({'type': 'loading', 'message': 'Loading and processing your custom names...', 'progress': 5})}\n\n"
-                time.sleep(0.5)
+                time.sleep(0.2)
             
                 # Load data and create model
                 X, y, char_to_idx, idx_to_char, char_set, bigram_counts = fng_model.load_data(input_text="\n".join(custom_names))
@@ -93,7 +93,7 @@ def stream_progress():
 
                 # Training is about to start message
                 yield f"data: {json.dumps({'type': 'training', 'message': 'Starting model training...', 'progress': 10})}\n\n"
-                time.sleep(0.5)
+                time.sleep(0.2)
 
                 # Create a thread for model training
                 callback = fng_model.TrainingProgressCallback(total_epochs=epochs, stream_progress=progress_callback)
