@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import pickle
-import time
+import os
 from collections import Counter
 
 def load_model_data(model_name='my_model'):
@@ -26,9 +26,48 @@ def load_model_data(model_name='my_model'):
     
     return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts
 
-def generate_quality_names_stream(model_name, count=10, seed_text='', length=7, temperature=1.0, min_bigram_count=2):
+def generate_quality_names_stream(model_name, count=10, prefix_text='', length=None, temperature=1.0, min_bigram_count=2, custom_names=None):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
     model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts = load_model_data(model_name)
+
+    # Get available first letters for random prefix selection
+    if not prefix_text:
+        if custom_names:
+            # Pull first letters from the custom names
+            available_first_letters = [name.strip()[0] for name in custom_names if name.strip()]
+        else:
+            # Load names from textfile for pretrained models
+            textfile_path = os.path.join('textfiles', f"{model_name}_names.txt")
+            try:
+                with open(textfile_path, 'r', encoding='utf-8') as f:
+                    pretrained_names = [line.strip() for line in f if line.strip()]
+                available_first_letters = [name[0] for name in pretrained_names if name]
+            except FileNotFoundError:
+                # Fallback to char_set if textfile doesn't exist
+                available_first_letters = [char for char in char_set if char.isalpha()]
+    else:
+        available_first_letters = None  # Use provided prefix
+
+    # Set default length if not provided, and ensure it's an integer
+    if length is None or length == '':
+        if custom_names:
+            # Calculate average length from custom names
+            name_lengths = [len(name.strip()) for name in custom_names if name.strip()]
+            length = int(np.mean(name_lengths)) if name_lengths else 6
+        else:
+            # Calculate average length from pretrained model names
+            textfile_path = os.path.join('textfiles', f"{model_name}_names.txt")
+            try:
+                with open(textfile_path, 'r', encoding='utf-8') as f:
+                    pretrained_names = [line.strip() for line in f if line.strip()]
+                name_lengths = [len(name) for name in pretrained_names if name]
+                length = int(np.mean(name_lengths)) if name_lengths else 6
+            except FileNotFoundError:
+                # Fallback to default length if textfile doesn't exist
+                length = 6
+    else:
+        # Ensure length is an integer if provided
+        length = int(length)
 
     generated_names = set()
     attempts = 0
@@ -36,10 +75,16 @@ def generate_quality_names_stream(model_name, count=10, seed_text='', length=7, 
 
     while len(generated_names) < count and attempts < max_attempts:
         attempts += 1
-        seed = seed_text if seed_text else np.random.choice(list(char_to_idx.keys())).upper()
-        name = seed
+        
+        # Pick a random prefix for each name (if no specific prefix was provided)
+        if available_first_letters:
+            prefix = np.random.choice(available_first_letters).upper()
+        else:
+            prefix = prefix_text
+            
+        name = prefix
 
-        for _ in range(length - len(seed)):
+        for _ in range(length - len(prefix)):
             encoded = [char_to_idx[c] for c in name if c in char_to_idx]
             if not encoded:
                 encoded = [char_to_idx[np.random.choice(list(char_to_idx.keys()))]]
