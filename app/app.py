@@ -21,8 +21,8 @@ application = app
 progress_queue = queue.Queue()
 
 # Function to generate a name using the imported method
-def generate_name(model, seed_text, length=6, temperature=1.0):
-    return fng_name_generate.generate_name(model, seed_text, length, temperature)
+def generate_name(model, prefix_text, length=6, temperature=1.0):
+    return fng_name_generate.generate_name(model, prefix_text, length, temperature)
 
 # Progress callback function for model training
 def progress_callback(current_epoch, total_epochs):
@@ -50,8 +50,10 @@ def stream_progress():
         selected_model = request.form['model']
         count = int(request.form['count'])
         temperature = float(request.form['temperature'])
-        seed = request.form['seed']
-        length = int(request.form['length'])
+        prefix = request.form['prefix']
+        length = request.form['length']
+        if length:
+            length = int(length)
         epochs = 50
         
         # Clear any old messages from the queue
@@ -154,7 +156,7 @@ def stream_progress():
         name_stream = fng_name_generate.generate_quality_names_stream(
             model_name=model_name,
             count=count,
-            seed_text=seed,
+            prefix_text=prefix,
             length=length,
             temperature=temperature
         )
