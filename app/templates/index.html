@@ -112,6 +112,7 @@
                 <option value="american" {% if selected_model == 'american' %}selected{% endif %}>American Names</option>
                 <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German Names</option>
                 <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French Names</option>
+                <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese Names</option>
                 <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>Input Your Own Names</option>
             </select>
         </div>
@@ -128,30 +129,30 @@
 
         
     
-        <!-- Temperature, Seed, and Length Options -->
+        <!-- Temperature, Prefix, and Length Options -->
         <div class="form-group flex-container">
             <div>
                 <label for="temperature">Temperature (randomness):</label>
-                <input type="number" id="temperature" name="temperature" placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" 
-                value="{{ temperature if temperature is not none else 0.5 }}" required>
+                <input type="number" id="temperature" name="temperature" placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1"
+                value="1.0" required>
             </div>
             <div>
-                <label for="seed">Seed Text (first character(s)):</label>
-                <input type="text" id="seed" name="seed" placeholder="e.g., A" value="{{ seed }}" required>
+                <label for="prefix">Prefix Characters <span style="color: #a1a1a1;">(Optional)</span>:</label>
+                <input type="text" id="prefix" name="prefix" placeholder="e.g., A, Z, Az, Zaz" value="{{ prefix }}">
             </div>
             <div>
-                <label for="length">Name Length (characters):</label>
-                <input type="number" id="length" name="length" min="1" value="{{ length }}" required>
+                <label for="length">Name Length <span style="color: #a1a1a1;">(Optional)</span>:</label>
+                <input type="number" id="length" name="length" placeholder="average" min="1" value="{{ length }}">
             </div>
             <!-- Generate Count Dropdown -->
             <div class="form-group dropdown-inline">
                 <label for="count">Number of Names to Generate:</label>
                 <select id="count" name="count">
-                    <option value="1" {% if count == 1 %}selected{% endif %}>1</option>
-                    <option value="5" {% if count == 5 %}selected{% endif %}>5</option>
-                    <option value="10" {% if count == 10 %}selected{% endif %}>10</option>
-                    <option value="50" {% if count == 50 %}selected{% endif %}>50</option>
-                    <option value="100" {% if count == 100 %}selected{% endif %}>100</option>
+                    <option value="1">1</option>
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
                 </select>
             </div>
         </div>
@@ -159,8 +160,8 @@
     
         <!-- Execution Button with Error Messages -->
         <div class="button-container">
-            <!-- Seed and Length Error Message Display -->
-            <div id="error-message" class="error-message" style="display:none; min-height:1.5em;">Seed text cannot be longer than the name length.</div>
+            <!-- Prefix and Length Error Message Display -->
+            <div id="error-message" class="error-message" style="display:none; min-height:1.5em;">Prefix text cannot be longer than the name length.</div>
             <!-- Empty Names Field Error Message Display -->
             <div id="error-message-2" class="error-message" style="display:none; min-height:1.5em;">Custom Names field cannot be empty.</div>
             <div class="form-group">
@@ -197,7 +198,7 @@
         const form = document.getElementById('name-generator-form');
 
         // References to the form fields for dynamic error message
-        const seedInput = document.getElementById('seed');
+        const prefixInput = document.getElementById('prefix');
         const lengthInput = document.getElementById('length');
         const errorMessage = document.getElementById('error-message');
         const errorMessage2 = document.getElementById('error-message-2');
@@ -274,11 +275,11 @@
             event.preventDefault(); //Prevent normal form submission
 
             //Validate inputs
-            const seedText = seedInput.value;
+            const prefixText = prefixInput.value;
             const nameLength = parseInt(lengthInput.value);
             const customNamesTextValue = customNamesText.value.trim();
 
-            if (seedText.length > nameLength) {
+            if (prefixText.length > nameLength) {
                 errorMessage.style.display = 'block'; // Show error message
                 return;
             } else {
