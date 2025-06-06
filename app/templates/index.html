@@ -136,12 +136,12 @@
                 value="1.0" required>
             </div>
             <div>
-                <label for="prefix">Prefix (first character(s)):</label>
-                <input type="text" id="prefix" name="prefix" placeholder="e.g., A" value="{{ prefix }}">
+                <label for="prefix">Prefix Characters <span style="color: #a1a1a1;">(Optional)</span>:</label>
+                <input type="text" id="prefix" name="prefix" placeholder="e.g., A, Z, Az, Zaz" value="{{ prefix }}">
             </div>
             <div>
-                <label for="length">Name Length (characters):</label>
-                <input type="number" id="length" name="length" min="1" value="{{ length }}">
+                <label for="length">Name Length <span style="color: #a1a1a1;">(Optional)</span>:</label>
+                <input type="number" id="length" name="length" placeholder="average" min="1" value="{{ length }}">
             </div>
             <!-- Generate Count Dropdown -->
             <div class="form-group dropdown-inline">
