@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+import keras
 import pickle
 from collections import Counter
 
@@ -50,26 +51,64 @@ def get_bigram_counts(names):
     bigram_counts = Counter(bigrams)
     return bigram_counts
 
-def create_bigram_penalty_loss(char_to_idx, idx_to_char, bigram_counts, min_count=5):
-    rare_bigrams = {bigram for bigram, count in bigram_counts.items() if count < min_count}
+@keras.saving.register_keras_serializable()
+class BigramPenaltyLoss:
+    def __init__(self, char_to_idx=None, idx_to_char=None, bigram_counts=None, min_count=5, penalty_weight=0.5):
+        self.penalty_weight = penalty_weight
+        self.min_count = min_count
 
-    def custom_loss(y_true, y_pred):
-        y_true_idx = tf.argmax(y_true, axis=-1)  # True char index
-        y_pred_idx = tf.argmax(y_pred, axis=-1)  # Predicted char index
+        self.char_to_idx = char_to_idx
+        self.idx_to_char = idx_to_char
 
-        # Convert indices to chars
-        y_true_chars = tf.gather(list(idx_to_char.values()), y_true_idx)
-        y_pred_chars = tf.gather(list(idx_to_char.values()), y_pred_idx)
+        if char_to_idx and idx_to_char and bigram_counts:
+            self._build_penalty_table(char_to_idx, idx_to_char, bigram_counts)
+        else:
+            self.table = None
+            self.idx_chars = None
 
-        bigrams = tf.strings.join([y_true_chars, y_pred_chars])
-        penalties = tf.cast(tf.map_fn(lambda bg: bg in rare_bigrams, bigrams, dtype=tf.bool), tf.float32)
+    def _build_penalty_table(self, char_to_idx, idx_to_char, bigram_counts):
+        all_bigrams = [a + b for a in char_to_idx for b in char_to_idx]
+        penalty_dict = {
+            bg: 1.0 if bigram_counts.get(bg, 0) < self.min_count else 0.0
+            for bg in all_bigrams
+        }
 
+        keys_tensor = tf.constant(list(penalty_dict.keys()))
+        values_tensor = tf.constant(list(penalty_dict.values()), dtype=tf.float32)
+
+        self.table = tf.lookup.StaticHashTable(
+            tf.lookup.KeyValueTensorInitializer(keys_tensor, values_tensor),
+            default_value=0.0
+        )
+
+        self.idx_chars = tf.constant([idx_to_char[i] for i in range(len(idx_to_char))])
+
+    def __call__(self, y_true, y_pred):
         base_loss = tf.keras.losses.categorical_crossentropy(y_true, y_pred)
-        penalty_multiplier = 1.0 + 4.0 * penalties  # Increase loss for rare bigrams
 
-        return base_loss * penalty_multiplier
+        if self.table is None or self.idx_chars is None:
+            return base_loss  # No penalty if data not injected
 
-    return custom_loss
+        pred_indices = tf.argmax(y_pred, axis=-1)
+        prev_indices = tf.pad(pred_indices, [[1, 0]], constant_values=0)[:-1]
+
+        prev_chars = tf.gather(self.idx_chars, prev_indices)
+        curr_chars = tf.gather(self.idx_chars, pred_indices)
+
+        bigrams = tf.strings.join([prev_chars, curr_chars])
+        penalties = self.table.lookup(bigrams)
+
+        return base_loss + self.penalty_weight * penalties
+
+    def get_config(self):
+        return {
+            "penalty_weight": self.penalty_weight,
+            "min_count": self.min_count
+        }
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
 
 def load_data(input_text=None, input_file=None):
     names = load_names(input_text, input_file)  # Load data from string or file
@@ -92,7 +131,7 @@ def create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts):
     
     # Using standard categorical crossentropy 
     model.compile(
-        loss=create_bigram_penalty_loss(char_to_idx, idx_to_char, bigram_counts),
+        loss=BigramPenaltyLoss(char_to_idx, idx_to_char, bigram_counts),
         optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
         metrics=['accuracy']
     )

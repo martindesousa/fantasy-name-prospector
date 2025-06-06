@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 import pickle
 import os
-from collections import Counter
+from app.fng_model import BigramPenaltyLoss
 
 def load_model_data(model_name='my_model'):
     if model_name.startswith('custom'):
@@ -12,7 +12,10 @@ def load_model_data(model_name='my_model'):
         model_path = f'app/models/{model_name}.keras'
         data_path = f'app/models/{model_name}_data.pkl'
 
-    model = tf.keras.models.load_model(model_path)
+    model = tf.keras.models.load_model(
+        model_path,
+        custom_objects={'BigramPenaltyLoss': BigramPenaltyLoss}
+    )
 
     with open(data_path, 'rb') as file:
         data_dict = pickle.load(file)
