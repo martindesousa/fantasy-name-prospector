@@ -1,4 +1,4 @@
-# fantasy-names-generator
+# Fantasy Names Generator
 Fantasy Names Generator is a website that allows users to generate names based on language patterns.
 The general idea is to generate names based on a certain learnable patterns in a set of names.  
 
