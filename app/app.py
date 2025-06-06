@@ -103,7 +103,7 @@ def stream_progress():
                 def train_thread():
                     try:
                         fng_model.train_model(X, y, model, epochs=epochs, batch_size=64, stream_progress=progress_callback)
-                        fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name=model_name)
+                        fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, model_name=model_name)
                         # Put a completion message in the queue
                         progress_queue.put({'epoch': epochs, 'total': epochs, 'complete': True})
                     except Exception as e:

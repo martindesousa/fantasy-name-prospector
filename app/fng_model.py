@@ -50,19 +50,26 @@ def get_bigram_counts(names):
     bigram_counts = Counter(bigrams)
     return bigram_counts
 
-def create_bigram_penalty_function(char_to_idx, idx_to_char, bigram_counts, min_count=5):
-    """
-    Creates a simpler bigram penalty function that can be used during inference
-    """
-    # Pre-compute rare bigrams set for faster lookup
+def create_bigram_penalty_loss(char_to_idx, idx_to_char, bigram_counts, min_count=5):
     rare_bigrams = {bigram for bigram, count in bigram_counts.items() if count < min_count}
-    
-    def is_rare_bigram(char1, char2):
-        """Check if a bigram is rare"""
-        bigram = char1 + char2
-        return bigram in rare_bigrams
-    
-    return is_rare_bigram
+
+    def custom_loss(y_true, y_pred):
+        y_true_idx = tf.argmax(y_true, axis=-1)  # True char index
+        y_pred_idx = tf.argmax(y_pred, axis=-1)  # Predicted char index
+
+        # Convert indices to chars
+        y_true_chars = tf.gather(list(idx_to_char.values()), y_true_idx)
+        y_pred_chars = tf.gather(list(idx_to_char.values()), y_pred_idx)
+
+        bigrams = tf.strings.join([y_true_chars, y_pred_chars])
+        penalties = tf.cast(tf.map_fn(lambda bg: bg in rare_bigrams, bigrams, dtype=tf.bool), tf.float32)
+
+        base_loss = tf.keras.losses.categorical_crossentropy(y_true, y_pred)
+        penalty_multiplier = 1.0 + 4.0 * penalties  # Increase loss for rare bigrams
+
+        return base_loss * penalty_multiplier
+
+    return custom_loss
 
 def load_data(input_text=None, input_file=None):
     names = load_names(input_text, input_file)  # Load data from string or file
@@ -83,9 +90,9 @@ def create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts):
         tf.keras.layers.Dense(len(char_set), activation='softmax')
     ])
     
-    # Using standard categorical crossentropy - simpler and more effective
+    # Using standard categorical crossentropy 
     model.compile(
-        loss='categorical_crossentropy',
+        loss=create_bigram_penalty_loss(char_to_idx, idx_to_char, bigram_counts),
         optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
         metrics=['accuracy']
     )
@@ -111,7 +118,7 @@ def train_model(X, y, model, epochs=100, batch_size=64, stream_progress=None):
         callbacks=callbacks
     )
 
-def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name='my_model'):
+def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, model_name='my_model'):
     # Determine save path
     base_dir = os.path.join('app', 'models', 'custom' if model_name.startswith('custom') else '')
     os.makedirs(base_dir, exist_ok=True)
@@ -122,14 +129,13 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name=
     model.save(path + '.keras')
 
     # Prepare and save additional data
-    bigram_input = ' '.join(idx_to_char[i] for i in range(len(idx_to_char)))  # Assuming intentional
     data_dict = {
         'X': X,
         'y': y,
         'char_to_idx': char_to_idx,
         'idx_to_char': idx_to_char,
         'char_set': char_set,
-        'bigram_counts': get_bigram_counts(bigram_input)
+        'bigram_counts': bigram_counts
     }
 
     with open(path + '_data.pkl', 'wb') as file:
