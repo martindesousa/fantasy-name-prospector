@@ -56,7 +56,7 @@ def generate_quality_names_stream(model_name, count=10, prefix_text='', length=N
             length = int(np.mean(name_lengths)) if name_lengths else 6
         else:
             # Calculate average length from pretrained model names
-            textfile_path = os.path.join('textfiles', f"{model_name}_names.txt")
+            textfile_path = os.path.join('app', 'textfiles', f"{model_name}_names.txt")
             try:
                 with open(textfile_path, 'r', encoding='utf-8') as f:
                     pretrained_names = [line.strip() for line in f if line.strip()]
