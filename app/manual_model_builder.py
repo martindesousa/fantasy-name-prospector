@@ -1,5 +1,5 @@
 import os
-import app.fng_model as fng_model
+import fng_model as fng_model
 
     # Main function that prompts the user for the model name and file name, then trains and saves the model
 def main():
@@ -8,7 +8,7 @@ def main():
     model_path = os.path.join('models', f'{model_name}.keras')
     
     text_file = input("Enter the name of the text file contain names (e.g., 'american_names.txt'): ")
-    text_file_path = os.path.join('textfiles', f'{text_file}')
+    text_file_path = os.path.join('app', 'textfiles', f'{text_file}')
 
     # Ensure the text file exists
     if not os.path.exists(text_file_path):
@@ -28,7 +28,7 @@ def main():
 
     # Save the model and associated data
     print(f"Saving the {model_name} model and data...")
-    fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, model_name)
+    fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, model_name=model_name)
 
     print(f"Model '{model_name}' has been successfully trained and saved!")
 
