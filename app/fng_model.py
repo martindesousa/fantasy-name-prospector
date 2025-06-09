@@ -122,7 +122,7 @@ def create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts):
     # Enhanced model with bidirectional LSTM for better performance
     model = tf.keras.Sequential([
         tf.keras.layers.Embedding(input_dim=len(char_set), output_dim=64, input_length=X.shape[1]),
-        tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(100, return_sequences=True)),
+        tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(100, return_sequences=True, kernel_regularizer=tf.keras.regularizers.l2(0.001))),
         tf.keras.layers.Dropout(0.2),  # Add dropout for regularization
         tf.keras.layers.LSTM(100),
         # tf.keras.layers.BatchNormalization(),
