@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import pickle
 import os
+from collections import Counter
 from app.fng_model import BigramPenaltyLoss
 
 def load_model_data(model_name='my_model'):
@@ -25,29 +26,53 @@ def load_model_data(model_name='my_model'):
     char_to_idx = data_dict['char_to_idx']
     idx_to_char = data_dict['idx_to_char']
     char_set = data_dict['char_set']
-    bigram_counts = data_dict.get('bigram_counts', {})  # Get bigram counts if available
+    bigram_counts = data_dict.get('bigram_counts', {})
     
     return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts
 
-def generate_quality_names_stream(model_name, count=10, prefix_text='', length=None, temperature=1.0, min_bigram_count=2, custom_names=None):
+def generate_quality_names_stream(model_name, count=10, prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
-    model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts = load_model_data(model_name)
+    try:
+        model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts = load_model_data(model_name)
+    except FileNotFoundError as e:
+        print(f"Error loading model data: {e}")
+        return
 
     # Get available first letters for random prefix selection
     if not prefix_text:
         if custom_names:
             # Pull first letters from the custom names
-            available_first_letters = [name.strip()[0] for name in custom_names if name.strip()]
+            first_letter_counts = Counter(name.strip()[0] for name in custom_names if name.strip())
+            available_first_letters = list(first_letter_counts.keys())
+            letter_probs = np.array([first_letter_counts[char] for char in available_first_letters], dtype=np.float32)
+
+            # Soften letter_probs to be sensitive to temperature
+            letter_logits = np.log(letter_probs + 1e-8) / temperature
+            letter_probs = np.exp(letter_logits)
+            letter_probs /= letter_probs.sum()  # Normalize to get a proper probability distribution
         else:
             # Load names from textfile for pretrained models
-            textfile_path = os.path.join('textfiles', f"{model_name}_names.txt")
+            textfile_path = os.path.join('app', 'textfiles', f"{model_name}_names.txt")
             try:
                 with open(textfile_path, 'r', encoding='utf-8') as f:
                     pretrained_names = [line.strip() for line in f if line.strip()]
                 available_first_letters = [name[0] for name in pretrained_names if name]
+
+                # Compute frequency of each first letter
+                first_letter_counts = Counter(available_first_letters)
+                available_first_letters = list(first_letter_counts.keys())
+                letter_probs = np.array([first_letter_counts[char] for char in available_first_letters], dtype=np.float32)
+
+                # Apply temperature-sensitive softmax
+                letter_logits = np.log(letter_probs + 1e-8) / temperature
+                letter_probs = np.exp(letter_logits)
+                letter_probs /= letter_probs.sum()
             except FileNotFoundError:
                 # Fallback to char_set if textfile doesn't exist
                 available_first_letters = [char for char in char_set if char.isalpha()]
+                letter_probs = np.ones(len(available_first_letters), dtype=np.float32)
+                letter_probs /= letter_probs.sum()
+
     else:
         available_first_letters = None  # Use provided prefix
 
@@ -78,104 +103,49 @@ def generate_quality_names_stream(model_name, count=10, prefix_text='', length=N
 
     while len(generated_names) < count and attempts < max_attempts:
         attempts += 1
-        
+
         # Pick a random prefix for each name (if no specific prefix was provided)
         if available_first_letters:
-            prefix = np.random.choice(available_first_letters).upper()
+            prefix = np.random.choice(available_first_letters, p=letter_probs).upper()
         else:
             prefix = prefix_text
-            
+
         name = prefix
 
-        for _ in range(length - len(prefix)):
+        while len(name) < length:
             encoded = [char_to_idx[c] for c in name if c in char_to_idx]
             if not encoded:
                 encoded = [char_to_idx[np.random.choice(list(char_to_idx.keys()))]]
             encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
+
             predictions = model.predict(encoded, verbose=0)[0]
 
+            # Apply temperature-based sampling
             if temperature == 0:
                 predicted_index = np.argmax(predictions)
             else:
-                predictions = np.log(predictions + 1e-8) / (temperature * 0.5)
-                probs = np.exp(predictions) / np.sum(np.exp(predictions))
-                sorted_indices = np.argsort(-probs)
+                logits = np.log(predictions + 1e-8) / temperature
+                probs = np.exp(logits)
+                probs /= np.sum(probs)
+                predicted_index = np.random.choice(len(probs), p=probs)
 
-                if bigram_counts and len(name) > 0:
-                    last_char = name[-1]
-                    for idx in sorted_indices[:10]:
-                        if bigram_counts.get(last_char + idx_to_char[idx], 0) >= min_bigram_count:
-                            predicted_index = idx
-                            break
-                    else:
-                        predicted_index = sorted_indices[0]
-                else:
-                    predicted_index = np.random.choice(len(probs), p=probs)
+            next_char = idx_to_char[predicted_index]
 
-            name += idx_to_char[predicted_index]
+            # Skip invalid or non-alphabetic characters just to be safe
+            if next_char in ['\n', ' ', '', '<PAD>']:
+                continue
 
-        if name not in generated_names:
-            generated_names.add(name)
-            yield name
+            name += next_char
+
+        # Ensure the generated name has the exact desired length
+        if len(name) == length:
+            # Optionally add the end token if it makes sense for your model's logic
+            # encoded = [char_to_idx[c] for c in name if c in char_to_idx]
+            # encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
+            # predictions = model.predict(encoded, verbose=0)[0]
+            # end_token_idx = char_to_idx.get('<END>')
+            # if end_token_idx is not None and np.argmax(predictions) == end_token_idx:
+            if name not in generated_names:
+                generated_names.add(name)
+                yield name
         # else silently retry
-
-# def generate_quality_names(model_name, count=10, seed_text='', length=7, temperature=1.0, min_bigram_count=2):
-#     """Generate names of fixed length, optionally using a seed or random char, filtered by quality if needed."""
-#     model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts = load_model_data(model_name)
-
-#     quality_names = []
-#     attempts = 0
-#     max_attempts = count * 3  # Limit to avoid infinite loops if filtering is on
-
-#     while len(quality_names) < count and attempts < max_attempts:
-#         # Use seed if provided, else pick a fresh random one each time
-#         if seed_text:
-#             seed = ''.join(c for c in seed_text if c in char_to_idx)
-#             if not seed:
-#                 seed = np.random.choice(list(char_to_idx.keys()))
-#         else:
-#             seed = np.random.choice(list(char_to_idx.keys()))
-
-#         name = seed
-
-#         for _ in range(length - len(seed)):
-#             # Encode current name state
-#             encoded = [char_to_idx[c] for c in name]
-#             encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
-
-#             # Predict next character probabilities
-#             predictions = model.predict(encoded, verbose=0)[0]
-
-#             if temperature == 0:
-#                 predicted_char_index = np.argmax(predictions)
-#             else:
-#                 predictions = np.log(predictions + 1e-8) / (temperature * 0.5)  # scale temperature
-#                 probabilities = np.exp(predictions) / np.sum(np.exp(predictions))
-#                 sorted_indices = np.argsort(-probabilities)
-
-#                 if bigram_counts and len(name) > 0:
-#                     last_char = name[-1]
-
-#                     for idx in sorted_indices[:10]:
-#                         candidate_char = idx_to_char[idx]
-#                         bigram = last_char + candidate_char
-#                         if bigram_counts.get(bigram, 0) >= min_bigram_count:
-#                             predicted_char_index = idx
-#                             break
-#                     else:
-#                         predicted_char_index = sorted_indices[0]
-#                 else:
-#                     predicted_char_index = np.random.choice(len(probabilities), p=probabilities)
-
-#             name += idx_to_char[predicted_char_index]
-
-#         # Optionally filter names (uncomment if needed)
-#         # if filter_name_by_quality(name, bigram_counts, min_count=min_bigram_count):
-#         #     quality_names.append(name)
-#         # else:
-#         #     attempts += 1
-
-#         quality_names.append(name)
-#         attempts += 1
-
-#     return quality_names
