@@ -8,16 +8,38 @@ from collections import Counter
 # HELPER METHODS FOR load_data #############################################################################
 def load_names(input_text=None, input_file=None):
     if input_text:
-        names = input_text.splitlines()  # If input_text is provided, split it into names
+        lines = input_text.splitlines()  # If input_text is provided, split it into names
     elif input_file and os.path.exists(input_file):
         with open(input_file, 'r', encoding='utf-8') as file: # Open the file with UTF-8 encoding to handle special characters correctly
-            names = file.read().splitlines()
+            lines = file.read().splitlines()
     else:
         raise ValueError("Must provide either input_text or input_file.")
+    
+    # Parse gender-tagged names
+    names = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check for gender tags
+        if line.startswith('<F>') or line.startswith('<M>') or line.startswith('<N>'):
+            # Keep the gender tag as part of the name for training
+            names.append(line)
+        else:
+            # Automatically add <N> tag for names without gender tags
+            names.append(f"<N> {line}")
+    
     return names
 
 def create_char_mappings(names):
-    char_set = sorted(set(''.join(names)))
+    # Extract all characters including gender tokens
+    all_text = ''.join(names)
+    char_set = sorted(set(all_text))
+    
+    # Ensure gender tokens are properly handled as individual characters
+    # The angle brackets and letters will be in char_set automatically
+    
     char_to_idx = {char: idx for idx, char in enumerate(char_set)}
     idx_to_char = {idx: char for char, idx in char_to_idx.items()}
     return char_to_idx, idx_to_char, char_set
@@ -25,14 +47,22 @@ def create_char_mappings(names):
 def prepare_training_data(names, char_to_idx):
     sequences = [] 
     for name in names:
+        # Convert each character (including those in gender tags) to indices
         seq = [char_to_idx[char] for char in name]
+        if seq:  # Only add non-empty sequences
+            sequences.append(seq)
         sequences.append(seq)
+
     X = []
     y = []
     for seq in sequences:
         for i in range(1, len(seq)):
             X.append(seq[:i])
             y.append(seq[i])
+
+    if not X:  # Handle empty data
+        raise ValueError("No valid training sequences generated")
+    
     X = tf.keras.preprocessing.sequence.pad_sequences(X, maxlen=max(len(seq) for seq in sequences), padding='pre')
     y = tf.keras.utils.to_categorical(y, num_classes=len(char_to_idx))
     return X, y
@@ -139,7 +169,7 @@ def create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts):
     return model
 
 # Train the model with early stopping to prevent overfitting
-def train_model(X, y, model, epochs=100, batch_size=64, stream_progress=None):
+def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None):
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='loss',
         patience=5,
@@ -154,6 +184,7 @@ def train_model(X, y, model, epochs=100, batch_size=64, stream_progress=None):
         X, y, 
         epochs=epochs, 
         batch_size=batch_size,
+        shuffle=True,
         callbacks=callbacks
     )
 

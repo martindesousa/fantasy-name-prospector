@@ -78,23 +78,48 @@
         }
         .error-message {
             position: absolute;
-            min-height: 1.5em; /* reserve vertical space */
+            min-height: 1.0em; /* reserve vertical space */
             color: red;
-            visibility: hidden; /* hide but keep space */
+            display: none;
             font-size: 15px; 
+            font-weight: bold;
             text-align: center; 
-            transform: translateX(70%); /* Correct centering */
+            transform: translateX(70%) translateY(-15px); /* Correct centering */
             
         }
         #custom-names-container {
             display: none;
         }
         #custom-notice {
-        display: none;
-        color: red;
-        font-weight: bold;
-        font-size: 12px;
-        margin-top: 5px; /* Adjust this for spacing */
+            display: none;
+            color: red;
+            font-weight: bold;
+            font-size: 12px;
+            margin-top: 5px; /* Adjust this for spacing */
+        }
+
+        .input-error {
+            border: 2px solid red;
+            outline: none;
+            transition: border 0.2s ease;
+        }
+
+        .flex-row {
+            display: flex;
+            align-items: flex-end; 
+            gap: 1em; /* space between model and gender dropdowns */
+            flex-wrap: wrap; /* allows responsive wrapping */
+            gap: 0.5em
+        }
+
+        .model-group {
+            flex: 1; 
+            min-width: 200px;
+        }
+
+        .gender-group {
+            flex: 0.29; /* Smaller width */
+            min-width: 100px;
         }
 
 
@@ -105,16 +130,29 @@
     <h1>Fantasy Name Generator</h1>
     <!-- Main Form -->
     <form method="POST" action="/generate" id="name-generator-form">
-        <!-- Model Selection -->
-        <div class="form-group">
-            <label for="model">Select a Model:</label>
-            <select id="model" name="model">
-                <option value="american" {% if selected_model == 'american' %}selected{% endif %}>American Names</option>
-                <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German Names</option>
-                <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French Names</option>
-                <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese Names</option>
-                <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>Input Your Own Names</option>
-            </select>
+        <!-- Model and Gender Selection in One Row -->
+        <div class="form-group flex-row">
+            <!-- Model Dropdown -->
+            <div class="model-group">
+                <label for="model">Select a Model:</label>
+                <select id="model" name="model">
+                    <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>New Age American Names</option>
+                    <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German Names</option>
+                    <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French Names</option>
+                    <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese Names</option>
+                    <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>Input Your Own Names</option>
+                </select>
+            </div>
+
+            <!-- Gender Dropdown -->
+            <div class="gender-group">
+                <label for="gender">Gender:</label>
+                <select id="gender" name="gender">
+                    <option value="neutral" selected>Neutral</option>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                </select>
+            </div>
         </div>
 
          <!-- Custom Names Input Field (Initially hidden) -->
@@ -138,7 +176,7 @@
             </div>
             <div>
                 <label for="prefix">Prefix Characters <span style="color: #a1a1a1;">(Optional)</span>:</label>
-                <input type="text" id="prefix" name="prefix" placeholder="e.g., A, Z, Az, Zaz" value="{{ prefix }}">
+                <input type="text" id="prefix" name="prefix" placeholder="A, Aa, Aaa, ..." value="{{ prefix }}">
             </div>
             <div>
                 <label for="length">Name Length <span style="color: #a1a1a1;">(Optional)</span>:</label>
@@ -161,9 +199,7 @@
         <!-- Execution Button with Error Messages -->
         <div class="button-container">
             <!-- Prefix and Length Error Message Display -->
-            <div id="error-message" class="error-message" style="display:none; min-height:1.5em;">Prefix text cannot be longer than the name length.</div>
-            <!-- Empty Names Field Error Message Display -->
-            <div id="error-message-2" class="error-message" style="display:none; min-height:1.5em;">Custom Names field cannot be empty.</div>
+            <div id="error-message" class="error-message" style="display:none; min-height:1.5em;">Prefix text cannot be longer than name length.</div>
             <div class="form-group">
                 <button id="generate-button" button type="submit" class="submit-button">Generate</button>
                 <button id="train-button" button type="submit" class="submit-button" style="display:none;">Train</button>
@@ -201,7 +237,6 @@
         const prefixInput = document.getElementById('prefix');
         const lengthInput = document.getElementById('length');
         const errorMessage = document.getElementById('error-message');
-        const errorMessage2 = document.getElementById('error-message-2');
 
         // References to loading elements
         const loadingDiv = document.getElementById('loading');
@@ -281,16 +316,14 @@
 
             if (prefixText.length > nameLength) {
                 errorMessage.style.display = 'block'; // Show error message
+
+                prefixInput.classList.add('input-error');
+                lengthInput.classList.add('input-error');
                 return;
             } else {
                 errorMessage.style.display = 'none'; // Hide error message if valid
-            }
-
-            if (modelSelect.value === 'custom' && customNamesTextValue === "") {
-                errorMessage2.style.display = 'block';
-                return;
-            } else {
-                errorMessage2.style.display = 'none'; // Hide error message if valid
+                prefixInput.classList.remove('input-error');
+                lengthInput.classList.remove('input-error');
             }
 
              // Show loading elements

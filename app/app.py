@@ -48,6 +48,7 @@ def stream_progress():
     """Stream progress updates for model training and name generation"""
     def generate():
         selected_model = request.form['model']
+        gender = request.form['gender']
         count = int(request.form['count'])
         temperature = float(request.form['temperature'])
         prefix = request.form['prefix']
@@ -156,6 +157,7 @@ def stream_progress():
         name_stream = fng_name_generate.generate_quality_names_stream(
             model_name=model_name,
             count=count,
+            gender=gender,
             prefix_text=prefix,
             length=length,
             temperature=temperature
