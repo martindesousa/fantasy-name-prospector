@@ -175,16 +175,27 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, config):
     gender_info = config['gender_token_probs']
     chosen_gender_token = np.random.choice(gender_info['tokens'], p=gender_info['probabilities'])
     
-    # Choose first letter
+    # Handle prefix vs first letter selection
     letter_info = config['first_letter_info']
     if letter_info['use_prefix']:
-        first_letter = letter_info['prefix']
+        # Use the full prefix
+        prefix = letter_info['prefix']
+        formatted_prefix = prefix[0].upper() + prefix[1:].lower() if len(prefix) > 1 else prefix.upper()
+        name = f"{chosen_gender_token} {formatted_prefix}"
+        prefix_length = len(prefix)
     else:
+        # Choose single first letter
         first_letter = np.random.choice(letter_info['letters'], p=letter_info['probabilities'])
+        name = f"{chosen_gender_token} {first_letter.upper()}"
+        prefix_length = 1
+
+    # Calculate target length accounting for gender token, space, and prefix
+    gender_token_length = len(chosen_gender_token)  # e.g., "<F>" = 3 chars
+    space_length = 1
+    current_name_length = gender_token_length + space_length + prefix_length
     
-    # Start generation
-    name = f"{chosen_gender_token} {first_letter.upper()}"
-    target_full_length = len(name) + config['target_length'] - 1  # -1 because first_letter is already included
+    # Target total length should be gender token + space + desired name length
+    target_full_length = gender_token_length + space_length + config['target_length']
     
     # Generate characters until target length
     while len(name) < target_full_length:
