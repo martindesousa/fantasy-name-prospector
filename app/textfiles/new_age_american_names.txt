@@ -5197,9 +5197,6 @@
 <M> Makhi  
 <M> Manolo  
 <M> Taysom  
-Here are those names wrapped with `<M>` tags:
-
-```
 <M> Yariel  
 <M> Calder  
 <M> Copeland  
@@ -5601,9 +5598,6 @@ Here are those names wrapped with `<M>` tags:
 <M> Arya  
 <M> Braeden  
 <M> Braiden  
-Here’s your list with `<M>` tags added:
-
-```
 <M> Broderick  
 <M> Carmello  
 <M> Casimir  
