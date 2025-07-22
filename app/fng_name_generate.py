@@ -27,125 +27,235 @@ def load_model_data(model_name='my_model'):
     idx_to_char = data_dict['idx_to_char']
     char_set = data_dict['char_set']
     bigram_counts = data_dict.get('bigram_counts', {})
+    avg_length = data_dict.get('avg_length', 6)
     
-    return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts
+    return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length
 
-def generate_quality_names_stream(model_name, count=10, prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None):
+def get_avg_length(model_name):
+    """Get average length and whether it's a default or actual average."""
+    try:
+        if model_name.startswith('custom'):
+            data_path = f'app/models/custom/{model_name}_data.pkl'
+        else:
+            data_path = f'app/models/{model_name}_data.pkl'
+        
+        with open(data_path, 'rb') as file:
+            data_dict = pickle.load(file)
+        
+        # Check if avg_length exists in the data
+        if 'avg_length' in data_dict:
+            return data_dict['avg_length'], False  # Actual length
+        else:
+            return 6, True  # Default fallback
+            
+    except FileNotFoundError:
+        return 6, True  # Default fallback
+
+def analyze_training_data(model_name, custom_names):
+    """Analyze training data to get gender proportions."""
+    gender_stats = {"<F>": [], "<M>": [], "<N>": []}
+    
+    if custom_names:
+        names_to_analyze = custom_names
+    else:
+        # Load from textfile for pretrained models
+        textfile_path = os.path.join('app', 'textfiles', f"{model_name}_names.txt")
+        try:
+            with open(textfile_path, 'r', encoding='utf-8') as f:
+                names_to_analyze = [line.strip() for line in f if line.strip()]
+        except FileNotFoundError:
+            # Return default stats if no file found
+            return {
+                "<F>": ["Anna", "Emma", "Sophie"] * 1000,
+                "<M>": ["John", "Mike", "David"] * 1000, 
+                "<N>": ["Riley", "Alex", "Jordan"] * 300
+            }
+    
+    # Parse names and categorize by gender
+    for name in names_to_analyze:
+        name = name.strip()
+        if not name:
+            continue
+            
+        if name.startswith('<F>'):
+            clean_name = name[3:].strip()
+            if clean_name:
+                gender_stats["<F>"].append(clean_name)
+        elif name.startswith('<M>'):
+            clean_name = name[3:].strip()
+            if clean_name:
+                gender_stats["<M>"].append(clean_name)
+        elif name.startswith('<N>'):
+            clean_name = name[3:].strip()
+            if clean_name:
+                gender_stats["<N>"].append(clean_name)
+        else:
+            # Names without gender tags go to neutral
+            gender_stats["<N>"].append(name)
+    
+    return gender_stats
+
+def calculate_gender_probabilities(gender_stats, gender_preference):
+    """Calculate gender token probabilities based on training data and user preference."""
+    # Count occurrences of each gender
+    gender_counts = {token: len(names) for token, names in gender_stats.items()}
+    total = sum(gender_counts.values())
+    
+    if total == 0:
+        base_probs = {"<F>": 0.4, "<M>": 0.4, "<N>": 0.2}
+    else:
+        base_probs = {token: count / total for token, count in gender_counts.items()}
+    
+    # Select tokens based on preference
+    if gender_preference == "female":
+        tokens = ["<F>", "<N>"]
+    elif gender_preference == "male":
+        tokens = ["<M>", "<N>"]
+    else:  # neutral or any other value
+        tokens = ["<F>", "<M>", "<N>"]
+    
+    # Calculate probabilities for selected tokens
+    selected_probs = [base_probs[token] for token in tokens]
+    total_selected = sum(selected_probs)
+    
+    if total_selected == 0:
+        normalized_probs = [1.0 / len(tokens)] * len(tokens)
+    else:
+        normalized_probs = [p / total_selected for p in selected_probs]
+    
+    return {'tokens': tokens, 'probabilities': normalized_probs}
+
+def prepare_first_letter_distribution(gender_stats, prefix_text, temperature):
+    """Prepare first letter distribution with temperature adjustment."""
+    if prefix_text:
+        return {'use_prefix': True, 'prefix': prefix_text}
+    
+    # Collect all first letters from training data
+    first_letter_counts = Counter()
+    for names_list in gender_stats.values():
+        for name in names_list:
+            if name:
+                first_letter_counts[name[0].upper()] += 1
+    
+    if not first_letter_counts:
+        # Fallback to uniform distribution
+        letters = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+        probabilities = np.ones(len(letters)) / len(letters)
+        return {'use_prefix': False, 'letters': letters, 'probabilities': probabilities}
+    
+    # Apply temperature to letter probabilities
+    letters = list(first_letter_counts.keys())
+    counts = np.array([first_letter_counts[char] for char in letters], dtype=np.float32)
+    
+    letter_logits = np.log(counts + 1e-8) / temperature
+    probabilities = np.exp(letter_logits)
+    probabilities /= probabilities.sum()
+    
+    return {'use_prefix': False, 'letters': letters, 'probabilities': probabilities}
+
+def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature):
+    """Generate a single name using the provided configuration."""
+    # Choose gender token
+    chosen_gender_token = np.random.choice(gender_probs['tokens'], p=gender_probs['probabilities'])
+    
+    # Handle prefix vs first letter selection
+    if first_letter_info['use_prefix']:
+        # Use the full prefix
+        prefix = first_letter_info['prefix']
+        formatted_prefix = prefix[0].upper() + prefix[1:].lower() if len(prefix) > 1 else prefix.upper()
+        name = f"{chosen_gender_token} {formatted_prefix}"
+        prefix_length = len(prefix)
+    else:
+        # Choose single first letter
+        first_letter = np.random.choice(first_letter_info['letters'], p=first_letter_info['probabilities'])
+        name = f"{chosen_gender_token} {first_letter.upper()}"
+        prefix_length = 1
+
+    # Calculate target length accounting for gender token, space, and prefix
+    gender_token_length = len(chosen_gender_token)  # e.g., "<F>" = 3 chars
+    space_length = 1
+    
+    # Target total length should be gender token + space + desired name length
+    target_full_length = gender_token_length + space_length + target_length
+    
+    # Generate characters until target length
+    while len(name) < target_full_length:
+        encoded = [char_to_idx[c] for c in name if c in char_to_idx]
+        if not encoded:
+            break
+            
+        encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
+        predictions = model.predict(encoded, verbose=0)[0]
+        
+        # Apply temperature sampling
+        next_char = sample_next_character(predictions, idx_to_char, temperature)
+        
+        # Skip unwanted characters
+        if should_skip_character(next_char, name, chosen_gender_token):
+            continue
+            
+        name += next_char
+    
+    # Clean and return the name
+    return clean_generated_name(name)
+
+def sample_next_character(predictions, idx_to_char, temperature):
+    """Sample next character using temperature-based sampling."""
+    if temperature == 0:
+        predicted_index = np.argmax(predictions)
+    else:
+        logits = np.log(predictions + 1e-8) / temperature
+        probs = np.exp(logits)
+        probs /= np.sum(probs)
+        predicted_index = np.random.choice(len(probs), p=probs)
+    
+    return idx_to_char[predicted_index]
+
+def should_skip_character(char, current_name, gender_token):
+    """Determine if a character should be skipped during generation."""
+    # Skip invalid characters
+    if char in ['\n', ' ', '', '<PAD>']:
+        return True
+    
+    # Skip gender token characters if we're past the initial token
+    if char in ['<', '>', 'F', 'M', 'N'] and len(current_name) > len(gender_token) + 1:
+        return True
+    
+    return False
+
+def clean_generated_name(raw_name):
+    """Clean the generated name by removing gender tokens."""
+    cleaned = raw_name.replace('<F>', '').replace('<M>', '').replace('<N>', '').strip()
+    return cleaned if cleaned else None
+
+def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
     try:
-        model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts = load_model_data(model_name)
+        model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = load_model_data(model_name)
     except FileNotFoundError as e:
         print(f"Error loading model data: {e}")
         return
 
-    # Get available first letters for random prefix selection
-    if not prefix_text:
-        if custom_names:
-            # Pull first letters from the custom names
-            first_letter_counts = Counter(name.strip()[0] for name in custom_names if name.strip())
-            available_first_letters = list(first_letter_counts.keys())
-            letter_probs = np.array([first_letter_counts[char] for char in available_first_letters], dtype=np.float32)
-
-            # Soften letter_probs to be sensitive to temperature
-            letter_logits = np.log(letter_probs + 1e-8) / temperature
-            letter_probs = np.exp(letter_logits)
-            letter_probs /= letter_probs.sum()  # Normalize to get a proper probability distribution
-        else:
-            # Load names from textfile for pretrained models
-            textfile_path = os.path.join('app', 'textfiles', f"{model_name}_names.txt")
-            try:
-                with open(textfile_path, 'r', encoding='utf-8') as f:
-                    pretrained_names = [line.strip() for line in f if line.strip()]
-                available_first_letters = [name[0] for name in pretrained_names if name]
-
-                # Compute frequency of each first letter
-                first_letter_counts = Counter(available_first_letters)
-                available_first_letters = list(first_letter_counts.keys())
-                letter_probs = np.array([first_letter_counts[char] for char in available_first_letters], dtype=np.float32)
-
-                # Apply temperature-sensitive softmax
-                letter_logits = np.log(letter_probs + 1e-8) / temperature
-                letter_probs = np.exp(letter_logits)
-                letter_probs /= letter_probs.sum()
-            except FileNotFoundError:
-                # Fallback to char_set if textfile doesn't exist
-                available_first_letters = [char for char in char_set if char.isalpha()]
-                letter_probs = np.ones(len(available_first_letters), dtype=np.float32)
-                letter_probs /= letter_probs.sum()
-
-    else:
-        available_first_letters = None  # Use provided prefix
-
-    # Set default length if not provided, and ensure it's an integer
-    if length is None or length == '':
-        if custom_names:
-            # Calculate average length from custom names
-            name_lengths = [len(name.strip()) for name in custom_names if name.strip()]
-            length = int(np.mean(name_lengths)) if name_lengths else 6
-        else:
-            # Calculate average length from pretrained model names
-            textfile_path = os.path.join('app', 'textfiles', f"{model_name}_names.txt")
-            try:
-                with open(textfile_path, 'r', encoding='utf-8') as f:
-                    pretrained_names = [line.strip() for line in f if line.strip()]
-                name_lengths = [len(name) for name in pretrained_names if name]
-                length = int(np.mean(name_lengths)) if name_lengths else 6
-            except FileNotFoundError:
-                # Fallback to default length if textfile doesn't exist
-                length = 6
-    else:
-        # Ensure length is an integer if provided
-        length = int(length)
-
+    # Prepare configurations
+    gender_stats = analyze_training_data(model_name, custom_names)
+    gender_probs = calculate_gender_probabilities(gender_stats, gender)
+    first_letter_info = prepare_first_letter_distribution(gender_stats, prefix_text, temperature)
+    
+    # Use provided length or fall back to model's average length
+    target_length = int(length) if length is not None and length != '' else avg_length
+    
     generated_names = set()
+    yielded = 0
     attempts = 0
-    max_attempts = count * 10  # More attempts in case of many near-duplicates
+    max_attempts = count * 10
 
-    while len(generated_names) < count and attempts < max_attempts:
+    while yielded < count and attempts < max_attempts:
         attempts += 1
 
-        # Pick a random prefix for each name (if no specific prefix was provided)
-        if available_first_letters:
-            prefix = np.random.choice(available_first_letters, p=letter_probs).upper()
-        else:
-            prefix = prefix_text
-
-        name = prefix
-
-        while len(name) < length:
-            encoded = [char_to_idx[c] for c in name if c in char_to_idx]
-            if not encoded:
-                encoded = [char_to_idx[np.random.choice(list(char_to_idx.keys()))]]
-            encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
-
-            predictions = model.predict(encoded, verbose=0)[0]
-
-            # Apply temperature-based sampling
-            if temperature == 0:
-                predicted_index = np.argmax(predictions)
-            else:
-                logits = np.log(predictions + 1e-8) / temperature
-                probs = np.exp(logits)
-                probs /= np.sum(probs)
-                predicted_index = np.random.choice(len(probs), p=probs)
-
-            next_char = idx_to_char[predicted_index]
-
-            # Skip invalid or non-alphabetic characters just to be safe
-            if next_char in ['\n', ' ', '', '<PAD>']:
-                continue
-
-            name += next_char
-
-        # Ensure the generated name has the exact desired length
-        if len(name) == length:
-            # Optionally add the end token if it makes sense for your model's logic
-            # encoded = [char_to_idx[c] for c in name if c in char_to_idx]
-            # encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
-            # predictions = model.predict(encoded, verbose=0)[0]
-            # end_token_idx = char_to_idx.get('<END>')
-            # if end_token_idx is not None and np.argmax(predictions) == end_token_idx:
-            if name not in generated_names:
-                generated_names.add(name)
-                yield name
-        # else silently retry
+        # Generate a single name
+        name = generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature)
+        
+        if name and len(name) == target_length and name not in generated_names:
+            generated_names.add(name)
+            yielded += 1
+            yield name

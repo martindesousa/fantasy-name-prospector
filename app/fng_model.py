@@ -8,16 +8,38 @@ from collections import Counter
 # HELPER METHODS FOR load_data #############################################################################
 def load_names(input_text=None, input_file=None):
     if input_text:
-        names = input_text.splitlines()  # If input_text is provided, split it into names
+        lines = input_text.splitlines()  # If input_text is provided, split it into names
     elif input_file and os.path.exists(input_file):
         with open(input_file, 'r', encoding='utf-8') as file: # Open the file with UTF-8 encoding to handle special characters correctly
-            names = file.read().splitlines()
+            lines = file.read().splitlines()
     else:
         raise ValueError("Must provide either input_text or input_file.")
+    
+    # Parse gender-tagged names
+    names = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check for gender tags
+        if line.startswith('<F>') or line.startswith('<M>') or line.startswith('<N>'):
+            # Keep the gender tag as part of the name for training
+            names.append(line)
+        else:
+            # Automatically add <N> tag for names without gender tags
+            names.append(f"<N> {line}")
+    
     return names
 
 def create_char_mappings(names):
-    char_set = sorted(set(''.join(names)))
+    # Extract all characters including gender tokens
+    all_text = ''.join(names)
+    char_set = sorted(set(all_text))
+    
+    # Ensure gender tokens are properly handled as individual characters
+    # The angle brackets and letters will be in char_set automatically
+    
     char_to_idx = {char: idx for idx, char in enumerate(char_set)}
     idx_to_char = {idx: char for char, idx in char_to_idx.items()}
     return char_to_idx, idx_to_char, char_set
@@ -25,14 +47,22 @@ def create_char_mappings(names):
 def prepare_training_data(names, char_to_idx):
     sequences = [] 
     for name in names:
+        # Convert each character (including those in gender tags) to indices
         seq = [char_to_idx[char] for char in name]
+        if seq:  # Only add non-empty sequences
+            sequences.append(seq)
         sequences.append(seq)
+
     X = []
     y = []
     for seq in sequences:
         for i in range(1, len(seq)):
             X.append(seq[:i])
             y.append(seq[i])
+
+    if not X:  # Handle empty data
+        raise ValueError("No valid training sequences generated")
+    
     X = tf.keras.preprocessing.sequence.pad_sequences(X, maxlen=max(len(seq) for seq in sequences), padding='pre')
     y = tf.keras.utils.to_categorical(y, num_classes=len(char_to_idx))
     return X, y
@@ -109,13 +139,24 @@ class BigramPenaltyLoss:
     @classmethod
     def from_config(cls, config):
         return cls(**config)
+    
+def get_avg_length(names):
+    # Calculate average length (without gender tokens)
+    clean_lengths = [
+        len(name.replace('<F>', '').replace('<M>', '').replace('<N>', '').strip())
+        for name in names
+    ]
+    avg_length = int(round(np.mean(clean_lengths))) if clean_lengths else 6
+    return avg_length
+    
 
 def load_data(input_text=None, input_file=None):
     names = load_names(input_text, input_file)  # Load data from string or file
     char_to_idx, idx_to_char, char_set = create_char_mappings(names)  # Create character mappings
     X, y = prepare_training_data(names, char_to_idx)  # Prepare the training data
     bigram_counts = get_bigram_counts(names)  # Compute bigram counts
-    return X, y, char_to_idx, idx_to_char, char_set, bigram_counts
+    avg_length = get_avg_length(names) # Compute average length
+    return X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length
 
 # Create and compile the model
 def create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts):
@@ -139,14 +180,15 @@ def create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts):
     return model
 
 # Train the model with early stopping to prevent overfitting
-def train_model(X, y, model, epochs=100, batch_size=64, stream_progress=None):
+def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None):
     early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='loss',
+        monitor='val_loss',
         patience=5,
         restore_best_weights=True
     )
 
-    callbacks = [early_stopping] #Start with early stopping
+    # callbacks = [early_stopping] # Use if want early_stopping
+    callbacks = [] # Use if don't want early_stopping
     if stream_progress:
         callbacks.append(TrainingProgressCallback(total_epochs=epochs, stream_progress=stream_progress))
     
@@ -154,10 +196,12 @@ def train_model(X, y, model, epochs=100, batch_size=64, stream_progress=None):
         X, y, 
         epochs=epochs, 
         batch_size=batch_size,
+        shuffle=True,
+        validation_split=0.1,
         callbacks=callbacks
     )
 
-def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, model_name='my_model'):
+def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length, model_name='my_model'):
     # Determine save path
     base_dir = os.path.join('app', 'models', 'custom' if model_name.startswith('custom') else '')
     os.makedirs(base_dir, exist_ok=True)
@@ -167,6 +211,8 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_coun
     # Save the model
     model.save(path + '.keras')
 
+    
+
     # Prepare and save additional data
     data_dict = {
         'X': X,
@@ -174,7 +220,8 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_coun
         'char_to_idx': char_to_idx,
         'idx_to_char': idx_to_char,
         'char_set': char_set,
-        'bigram_counts': bigram_counts
+        'bigram_counts': bigram_counts,
+        'avg_length': avg_length
     }
 
     with open(path + '_data.pkl', 'wb') as file:
