@@ -139,6 +139,7 @@
                     <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>New Age American Names</option>
                     <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German Names</option>
                     <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French Names</option>
+                    <option value="greek" {% if selected_model == 'greek' %}selected{% endif %}>Greek Names</option>
                     <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese Names</option>
                     <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>Input Your Own Names</option>
                 </select>
@@ -180,7 +181,7 @@
             </div>
             <div>
                 <label for="length">Name Length <span style="color: #a1a1a1;">(Optional)</span>:</label>
-                <input type="number" id="length" name="length" placeholder="average" min="1" value="{{ length }}">
+                <input type="number" id="length" name="length" placeholder="default: 6" min="1" value="{{ length }}">
             </div>
             <!-- Generate Count Dropdown -->
             <div class="form-group dropdown-inline">
@@ -256,6 +257,40 @@
 
         // Track the last custom text that was successfully trained
         let lastTrainedCustomText = '';
+
+                
+        // Add this function after your existing variable declarations
+        function updateLengthPlaceholder() {
+            const selectedModel = modelSelect.value;
+
+            if (selectedModel === 'custom') {
+                lengthInput.placeholder = 'default: 6'; // Default for custom models
+                return;
+            }
+
+            // Fetch avg_length for selected model
+            fetch(`/get_model_avg_length?model=${selectedModel}`)
+                .then(response => response.json())
+                .then(data => {
+                    const prefix = data.is_default ? 'default: ' : 'average: ';
+                    lengthInput.placeholder = prefix + data.avg_length;
+                })
+                .catch(error => {
+                    console.log('Error fetching avg_length:', error);
+                    lengthInput.placeholder = 'default: 6'; // fallback
+                });
+        }
+
+        // Add event listener for model selection changes
+        modelSelect.addEventListener('change', function() {
+            // Your existing model change logic here (if any)
+            
+            // Update the length placeholder
+            updateLengthPlaceholder();
+        });
+
+        // Update placeholder on page load
+        updateLengthPlaceholder();
 
         // Function to update button visibility based on model and training status
         function updateButtonVisibility() {

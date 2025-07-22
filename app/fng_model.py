@@ -139,13 +139,24 @@ class BigramPenaltyLoss:
     @classmethod
     def from_config(cls, config):
         return cls(**config)
+    
+def get_avg_length(names):
+    # Calculate average length (without gender tokens)
+    clean_lengths = [
+        len(name.replace('<F>', '').replace('<M>', '').replace('<N>', '').strip())
+        for name in names
+    ]
+    avg_length = int(round(np.mean(clean_lengths))) if clean_lengths else 6
+    return avg_length
+    
 
 def load_data(input_text=None, input_file=None):
     names = load_names(input_text, input_file)  # Load data from string or file
     char_to_idx, idx_to_char, char_set = create_char_mappings(names)  # Create character mappings
     X, y = prepare_training_data(names, char_to_idx)  # Prepare the training data
     bigram_counts = get_bigram_counts(names)  # Compute bigram counts
-    return X, y, char_to_idx, idx_to_char, char_set, bigram_counts
+    avg_length = get_avg_length(names) # Compute average length
+    return X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length
 
 # Create and compile the model
 def create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts):
@@ -171,12 +182,13 @@ def create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts):
 # Train the model with early stopping to prevent overfitting
 def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None):
     early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='loss',
+        monitor='val_loss',
         patience=5,
         restore_best_weights=True
     )
 
-    callbacks = [early_stopping] #Start with early stopping
+    # callbacks = [early_stopping] # Use if want early_stopping
+    callbacks = [] # Use if don't want early_stopping
     if stream_progress:
         callbacks.append(TrainingProgressCallback(total_epochs=epochs, stream_progress=stream_progress))
     
@@ -185,10 +197,11 @@ def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None):
         epochs=epochs, 
         batch_size=batch_size,
         shuffle=True,
+        validation_split=0.1,
         callbacks=callbacks
     )
 
-def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, model_name='my_model'):
+def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length, model_name='my_model'):
     # Determine save path
     base_dir = os.path.join('app', 'models', 'custom' if model_name.startswith('custom') else '')
     os.makedirs(base_dir, exist_ok=True)
@@ -198,6 +211,8 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_coun
     # Save the model
     model.save(path + '.keras')
 
+    
+
     # Prepare and save additional data
     data_dict = {
         'X': X,
@@ -205,7 +220,8 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_coun
         'char_to_idx': char_to_idx,
         'idx_to_char': idx_to_char,
         'char_set': char_set,
-        'bigram_counts': bigram_counts
+        'bigram_counts': bigram_counts,
+        'avg_length': avg_length
     }
 
     with open(path + '_data.pkl', 'wb') as file:

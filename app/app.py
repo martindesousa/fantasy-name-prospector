@@ -33,9 +33,30 @@ def progress_callback(current_epoch, total_epochs):
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    # Get default avg_length from a default model (or set a fallback)
+    try:
+        avg_length = fng_name_generate.get_avg_length('my_model')  # or whatever your default model is
+    except:
+        avg_length = 6  # fallback
+    
+    return render_template('index.html', avg_length=avg_length)
 
-#Javascript will use this for checking if a custom model exists
+@app.route('/get_model_avg_length')
+def get_model_avg_length():
+    """API endpoint to get average length for a specific model"""
+    model_name = request.args.get('model', 'my_model')
+    
+    if model_name == 'custom':
+        # For custom models, return default since we don't know until training
+        return jsonify({'avg_length': 6, 'is_default': True})
+    else:
+        try:
+            avg_length, is_default = fng_name_generate.get_avg_length(model_name)
+            return jsonify({'avg_length': avg_length, 'is_default': is_default})
+        except:
+            return jsonify({'avg_length': 6, 'is_default': True})
+
+# Your existing routes remain the same...
 @app.route('/check_model_exists')
 def check_model_exists():
     model_name = request.args.get('model')
@@ -91,7 +112,7 @@ def stream_progress():
                 time.sleep(0.2)
             
                 # Load data and create model
-                X, y, char_to_idx, idx_to_char, char_set, bigram_counts = fng_model.load_data(input_text="\n".join(custom_names))
+                X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = fng_model.load_data(input_text="\n".join(custom_names))
                 model = fng_model.create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts)
 
                 # Training is about to start message
@@ -104,7 +125,7 @@ def stream_progress():
                 def train_thread():
                     try:
                         fng_model.train_model(X, y, model, epochs=epochs, batch_size=64, stream_progress=progress_callback)
-                        fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, model_name=model_name)
+                        fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length=avg_length, model_name=model_name)
                         # Put a completion message in the queue
                         progress_queue.put({'epoch': epochs, 'total': epochs, 'complete': True})
                     except Exception as e:
@@ -160,7 +181,8 @@ def stream_progress():
             gender=gender,
             prefix_text=prefix,
             length=length,
-            temperature=temperature
+            temperature=temperature,
+            custom_names=custom_names if selected_model == 'custom' else None
         )
 
         generated_names = []

@@ -27,25 +27,32 @@ def load_model_data(model_name='my_model'):
     idx_to_char = data_dict['idx_to_char']
     char_set = data_dict['char_set']
     bigram_counts = data_dict.get('bigram_counts', {})
+    avg_length = data_dict.get('avg_length', 6)
     
-    return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts
+    return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length
 
-def prepare_generation_config(model_name, custom_names, gender, prefix_text, length, temperature):
-    """Prepare all configuration data for generation including gender proportions and length."""
-    config = {}
-    
-    # Get gender proportions and length statistics from training data
-    gender_stats, length_stats = analyze_training_data(model_name, custom_names)
-    
-    config['gender_token_probs'] = calculate_gender_probabilities(gender_stats, gender)
-    config['target_length'] = determine_target_length(length_stats, length)
-    config['first_letter_info'] = prepare_first_letter_distribution(gender_stats, prefix_text, temperature)
-    config['temperature'] = temperature
-    
-    return config
+def get_avg_length(model_name):
+    """Get average length and whether it's a default or actual average."""
+    try:
+        if model_name.startswith('custom'):
+            data_path = f'app/models/custom/{model_name}_data.pkl'
+        else:
+            data_path = f'app/models/{model_name}_data.pkl'
+        
+        with open(data_path, 'rb') as file:
+            data_dict = pickle.load(file)
+        
+        # Check if avg_length exists in the data
+        if 'avg_length' in data_dict:
+            return data_dict['avg_length'], False  # Actual length
+        else:
+            return 6, True  # Default fallback
+            
+    except FileNotFoundError:
+        return 6, True  # Default fallback
 
 def analyze_training_data(model_name, custom_names):
-    """Analyze training data to get gender proportions and length statistics."""
+    """Analyze training data to get gender proportions."""
     gender_stats = {"<F>": [], "<M>": [], "<N>": []}
     
     if custom_names:
@@ -62,7 +69,7 @@ def analyze_training_data(model_name, custom_names):
                 "<F>": ["Anna", "Emma", "Sophie"] * 1000,
                 "<M>": ["John", "Mike", "David"] * 1000, 
                 "<N>": ["Riley", "Alex", "Jordan"] * 300
-            }, {"<F>": [4, 4, 6], "<M>": [4, 4, 5], "<N>": [5, 4, 6]}
+            }
     
     # Parse names and categorize by gender
     for name in names_to_analyze:
@@ -86,15 +93,7 @@ def analyze_training_data(model_name, custom_names):
             # Names without gender tags go to neutral
             gender_stats["<N>"].append(name)
     
-    # Calculate length statistics for each gender
-    length_stats = {}
-    for gender_token, names_list in gender_stats.items():
-        if names_list:
-            length_stats[gender_token] = [len(name) for name in names_list]
-        else:
-            length_stats[gender_token] = [6]  # Default length
-    
-    return gender_stats, length_stats
+    return gender_stats
 
 def calculate_gender_probabilities(gender_stats, gender_preference):
     """Calculate gender token probabilities based on training data and user preference."""
@@ -126,21 +125,6 @@ def calculate_gender_probabilities(gender_stats, gender_preference):
     
     return {'tokens': tokens, 'probabilities': normalized_probs}
 
-def determine_target_length(length_stats, user_length):
-    """Determine target length based on training data or user preference."""
-    if user_length is not None and user_length != '':
-        return int(user_length)
-    
-    # Calculate average length across all genders
-    all_lengths = []
-    for lengths in length_stats.values():
-        all_lengths.extend(lengths)
-    
-    if all_lengths:
-        return int(np.mean(all_lengths))
-    else:
-        return 6  # Default fallback
-
 def prepare_first_letter_distribution(gender_stats, prefix_text, temperature):
     """Prepare first letter distribution with temperature adjustment."""
     if prefix_text:
@@ -169,33 +153,30 @@ def prepare_first_letter_distribution(gender_stats, prefix_text, temperature):
     
     return {'use_prefix': False, 'letters': letters, 'probabilities': probabilities}
 
-def generate_single_name(model, X, char_to_idx, idx_to_char, config):
+def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature):
     """Generate a single name using the provided configuration."""
     # Choose gender token
-    gender_info = config['gender_token_probs']
-    chosen_gender_token = np.random.choice(gender_info['tokens'], p=gender_info['probabilities'])
+    chosen_gender_token = np.random.choice(gender_probs['tokens'], p=gender_probs['probabilities'])
     
     # Handle prefix vs first letter selection
-    letter_info = config['first_letter_info']
-    if letter_info['use_prefix']:
+    if first_letter_info['use_prefix']:
         # Use the full prefix
-        prefix = letter_info['prefix']
+        prefix = first_letter_info['prefix']
         formatted_prefix = prefix[0].upper() + prefix[1:].lower() if len(prefix) > 1 else prefix.upper()
         name = f"{chosen_gender_token} {formatted_prefix}"
         prefix_length = len(prefix)
     else:
         # Choose single first letter
-        first_letter = np.random.choice(letter_info['letters'], p=letter_info['probabilities'])
+        first_letter = np.random.choice(first_letter_info['letters'], p=first_letter_info['probabilities'])
         name = f"{chosen_gender_token} {first_letter.upper()}"
         prefix_length = 1
 
     # Calculate target length accounting for gender token, space, and prefix
     gender_token_length = len(chosen_gender_token)  # e.g., "<F>" = 3 chars
     space_length = 1
-    current_name_length = gender_token_length + space_length + prefix_length
     
     # Target total length should be gender token + space + desired name length
-    target_full_length = gender_token_length + space_length + config['target_length']
+    target_full_length = gender_token_length + space_length + target_length
     
     # Generate characters until target length
     while len(name) < target_full_length:
@@ -207,7 +188,7 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, config):
         predictions = model.predict(encoded, verbose=0)[0]
         
         # Apply temperature sampling
-        next_char = sample_next_character(predictions, idx_to_char, config['temperature'])
+        next_char = sample_next_character(predictions, idx_to_char, temperature)
         
         # Skip unwanted characters
         if should_skip_character(next_char, name, chosen_gender_token):
@@ -250,13 +231,18 @@ def clean_generated_name(raw_name):
 def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
     try:
-        model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts = load_model_data(model_name)
+        model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = load_model_data(model_name)
     except FileNotFoundError as e:
         print(f"Error loading model data: {e}")
         return
 
-    # Prepare all configurations at once
-    config = prepare_generation_config(model_name, custom_names, gender, prefix_text, length, temperature)
+    # Prepare configurations
+    gender_stats = analyze_training_data(model_name, custom_names)
+    gender_probs = calculate_gender_probabilities(gender_stats, gender)
+    first_letter_info = prepare_first_letter_distribution(gender_stats, prefix_text, temperature)
+    
+    # Use provided length or fall back to model's average length
+    target_length = int(length) if length is not None and length != '' else avg_length
     
     generated_names = set()
     yielded = 0
@@ -267,9 +253,9 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
         attempts += 1
 
         # Generate a single name
-        name = generate_single_name(model, X, char_to_idx, idx_to_char, config)
+        name = generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature)
         
-        if name and len(name) == config['target_length'] and name not in generated_names:
+        if name and len(name) == target_length and name not in generated_names:
             generated_names.add(name)
             yielded += 1
             yield name
