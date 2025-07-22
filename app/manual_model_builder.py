@@ -16,8 +16,8 @@ def main():
         print(f"Error: The text file '{text_file}' was not found.")
         return
 
-    # Handle data and return machine-learning values
-    X, y, char_to_idx, idx_to_char, char_set, bigram_counts = fng_model.load_data(input_file=text_file_path)
+    # Return data
+    X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = fng_model.load_data(input_file=text_file_path)
 
     # Create and compile the model
     model = fng_model.create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts)
@@ -28,7 +28,7 @@ def main():
 
     # Save the model and associated data
     print(f"Saving the {model_name} model and data...")
-    fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, model_name=model_name)
+    fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length, model_name=model_name)
 
     print(f"Model '{model_name}' has been successfully trained and saved!")
 
