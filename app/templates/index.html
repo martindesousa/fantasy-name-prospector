@@ -219,10 +219,10 @@
     {% if generated_names %}
     <div class="result">
         <h2>Generated Names:</h2>
-        <ul>
-            {% for name in generated_names %}
-                <li>{{ name }}</li>
-            {% endfor %}
+        <ul id="generated-name-list">
+        {% for name in generated_names %}
+            <li>{{ name }}</li>
+        {% endfor %}
         </ul>
     </div>
     {% endif %}
@@ -412,9 +412,33 @@
                                         case 'preparing':
                                         case 'loading':
                                         case 'training':
-                                        case 'generating':
                                             // Update UI for these streaming states
                                             loadingDiv.style.display = 'block';
+                                            break;
+                                            
+                                        case 'generating':
+                                            // Update UI for generating state
+                                            loadingDiv.style.display = 'block';
+                                            
+                                            // Create results container if it doesn't exist
+                                            let nameList = document.getElementById('generated-name-list');
+                                            if (!nameList) {
+                                                // Create the results div and name list
+                                                resultDiv.innerHTML = `
+                                                    <h2>Generated Names:</h2>
+                                                    <ul id="generated-name-list">
+                                                    </ul>
+                                                `;
+                                                document.body.appendChild(resultDiv);
+                                                nameList = document.getElementById('generated-name-list');
+                                            }
+                                            
+                                            // Add new name if provided
+                                            if (jsonData.name) {
+                                                const li = document.createElement('li');
+                                                li.textContent = jsonData.name;
+                                                nameList.appendChild(li);
+                                            }
                                             break;
                                             
                                         case 'training_complete':
@@ -431,14 +455,17 @@
                                             // Hide loading elements
                                             loadingDiv.style.display = 'none';
                                             
-                                            // Create results display
-                                            resultDiv.innerHTML = `
-                                                <h2>Generated Names:</h2>
-                                                <ul>
-                                                    ${jsonData.names.map(name => `<li>${name}</li>`).join('')}
-                                                </ul>
-                                            `;
-                                            document.body.appendChild(resultDiv);
+                                            // If we haven't created the results div yet (shouldn't happen with streaming)
+                                            // create it with all names at once
+                                            if (!document.querySelector('.result')) {
+                                                resultDiv.innerHTML = `
+                                                    <h2>Generated Names:</h2>
+                                                    <ul>
+                                                        ${jsonData.names.map(name => `<li>${name}</li>`).join('')}
+                                                    </ul>
+                                                `;
+                                                document.body.appendChild(resultDiv);
+                                            }
                                             
                                             // If this was a training + generation cycle, update the trained text
                                             if (modelSelect.value === 'custom' && trainButton.style.display !== 'none') {
@@ -447,11 +474,10 @@
                                             }
                                             break;
                                 
-                                            case 'error':
-                                                loadingText.textContent = "Error: " + jsonData.message;
-                                                loadingDiv.style.display = 'block';
-                                                break;
-
+                                        case 'error':
+                                            loadingText.textContent = "Error: " + jsonData.message;
+                                            loadingDiv.style.display = 'block';
+                                            break;
                                     }
                                 } catch (e) {
                                     console.error('Error parsing SSE data:', e);
