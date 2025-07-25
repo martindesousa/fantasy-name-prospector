@@ -188,7 +188,8 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
         predictions = model.predict(encoded, verbose=0)[0]
         
         # Apply temperature sampling
-        next_char = sample_next_character(predictions, idx_to_char, temperature)
+        prev_char = name[-1] if name else None
+        next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char)
         
         # Skip unwanted characters
         if should_skip_character(next_char, name, chosen_gender_token):
@@ -199,12 +200,21 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
     # Clean and return the name
     return clean_generated_name(name)
 
-def sample_next_character(predictions, idx_to_char, temperature):
+def sample_next_character(predictions, idx_to_char, temperature, prev_char=None, capital_penalty=2.0): #Increase capital penalty to decrease appearance of capital letters being generated mid-name
     """Sample next character using temperature-based sampling."""
     if temperature == 0:
         predicted_index = np.argmax(predictions)
     else:
         logits = np.log(predictions + 1e-8) / temperature
+
+        # Apply subtractive penalty to capital letters
+        for i in range(len(logits)):
+            char = idx_to_char[i]
+            if char.isupper():
+                #Don't penalize capital letters after odd characters
+                if prev_char not in (None, '-', '<' '>', ' '):
+                    logits[i] -= capital_penalty 
+
         probs = np.exp(logits)
         probs /= np.sum(probs)
         predicted_index = np.random.choice(len(probs), p=probs)
