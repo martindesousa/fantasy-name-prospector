@@ -4,15 +4,18 @@ The general idea is to generate names based on a certain learnable patterns in a
 
 Fantasy Names Generator is useful for many different purposes. Here is a just few of them:
 * Generating fantasy names that have a certain cultural "vibe"
-* Generating fresh, new, baby names that match a certain language
+* Generating fresh, new, baby names that match the constraints of a certain language
 * Learning how certain patterns appear and repeat in languages 
-* Building your own models to generate whatever style of name you want, ie. futuristic, pirate, 
+* Cultivating name ideas in your mind to allow your creative side to do the rest
+* Building your own models to generate whatever style of name you want, ie. "futuristic", "pirate", "country", "alien".  
 
 The website currently has these pretrained models that can be used to generate names:
 * American
 * French
 * German
 * Chinese
+* Greek
+* Russian
 * More will be coming!
 
 There are two ways to create a model:
