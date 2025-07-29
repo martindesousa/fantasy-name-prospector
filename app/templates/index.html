@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fantasy Name Generator</title>
+    <title>Fantasy Name Prospector</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -127,7 +127,7 @@
 
 </head>
 <body>
-    <h1>Fantasy Name Generator</h1>
+    <h1>Fantasy Name Prospector</h1>
     <!-- Main Form -->
     <form method="POST" action="/generate" id="name-generator-form">
         <!-- Model and Gender Selection in One Row -->
@@ -136,12 +136,13 @@
             <div class="model-group">
                 <label for="model">Select a Model:</label>
                 <select id="model" name="model">
-                    <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>New Age American Names</option>
-                    <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German Names</option>
+                    <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>American Names (New Age)</option>
+                    <option value="arabic" {% if selected_model == 'arabic' %}selected{% endif %}>Arabic Names</option>
+                    <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese Names</option>
                     <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French Names</option>
+                    <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German Names</option>
                     <option value="greek" {% if selected_model == 'greek' %}selected{% endif %}>Greek Names</option>
                     <option value="russian" {% if selected_model == 'russian' %}selected{% endif %}>Russian Names</option>
-                    <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese Names</option>
                     <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>Input Your Own Names</option>
                 </select>
             </div>
