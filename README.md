@@ -2,6 +2,9 @@
 Fantasy Name Prospector is a website that allows users to generate names based on language patterns.
 The general idea is to generate names based on a certain learnable patterns in a set of names.  
 
+You can access the website at https://fantasy-names-generator-8guwsg.fly.dev/
+(it may be load slow depending on whether it is being used or not)
+
 Fantasy Name Prospector is useful for many different purposes. Here is a just few of them:
 * Generating fantasy names that have a certain cultural "vibe"
 * Generating fresh, new, baby names that match the constraints of a certain language
