@@ -1,238 +1,432 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fantasy Name Prospector</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --accent-color: #58a6ff;
+            --accent-hover: #4493e0;
+            --success-color: #3fb950;
+            --success-hover: #2ea043;
+            --error-color: #f85149;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px auto;
-            padding: 20px;
-            max-width: 800px;
-            line-height: 1.6;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
         }
-        h1, h2 {
+
+        .main-container {
+            background: rgba(33, 38, 45, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin: 2rem auto;
+            max-width: 1000px;
+        }
+
+        .header-section {
+            background: linear-gradient(135deg, var(--accent-color) 0%, #7c3aed 100%);
+            border-radius: 16px 16px 0 0;
+            padding: 2rem;
             text-align: center;
+            position: relative;
+            overflow: hidden;
         }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 5px;
-        }
-        select, input, button {
-            padding: 8px;
-            font-size: 16px;
-            width: 100%;
-        }
-        button {
-            background-color: #007BFF;
-            color: #fff;
-            border: none;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }   
-        #train-button {
-            background-color: #28a745; 
-            color: white;
-        }
-        #train-button:hover {
-            background-color: #218838; 
-        }
-        .flex-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: stretch;
-            gap: 10px;
-        }
-        .flex-container > div {
-            flex: 1;
-            min-width: 100px;
-            max-width: 180px;
-        }
-        #train-button:disabled {
-            background-color: #6c757d;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        #generate-button:disabled {
-            background-color: #6c757d;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        .result {
-            margin-top: 30px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-        }
-        .dropdown-inline {
-            display: inline-block;
-        }
-        .error-message {
+
+        .header-section::before {
+            content: '';
             position: absolute;
-            min-height: 1.0em; /* reserve vertical space */
-            color: red;
-            display: none;
-            font-size: 15px; 
-            font-weight: bold;
-            text-align: center; 
-            transform: translateX(70%) translateY(-15px); /* Correct centering */
-            
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+            opacity: 0.3;
         }
-        #custom-names-container {
-            display: none;
+
+        .header-section h1 {
+            margin: 0;
+            font-weight: 500;
+            font-size: 2.5rem;
+            color: white;
+            position: relative;
+            z-index: 2;
         }
-        #custom-notice {
-            display: none;
-            color: red;
-            font-weight: bold;
-            font-size: 12px;
-            margin-top: 5px; /* Adjust this for spacing */
+
+        .header-section .subtitle {
+            margin-top: 0.5rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.1rem;
+            font-weight: 300;
+            position: relative;
+            z-index: 2;
+        }
+
+        .form-section {
+            padding: 2rem;
+        }
+
+        .form-control, .form-select {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: var(--bg-tertiary);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 0.2rem rgba(88, 166, 255, 0.25);
+            color: var(--text-primary);
+        }
+
+        .form-label {
+            color: var(--text-primary);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-color) 0%, #4493e0 100%);
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            padding: 0.75rem 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--accent-hover) 0%, #3a7bc8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color) 0%, #2ea043 100%);
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            padding: 0.75rem 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, var(--success-hover) 0%, #238636 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(63, 185, 80, 0.3);
+        }
+
+        .error-message {
+            color: var(--error-color);
+            font-weight: 500;
+            text-align: center;
+            margin: 1rem 0;
+            padding: 0.5rem;
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.2);
+            border-radius: 8px;
         }
 
         .input-error {
-            border: 2px solid red;
-            outline: none;
-            transition: border 0.2s ease;
+            border-color: var(--error-color) !important;
+            box-shadow: 0 0 0 0.2rem rgba(248, 81, 73, 0.25) !important;
         }
 
-        .flex-row {
+        .loading-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .progress {
+            height: 8px;
+            background-color: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--accent-color) 0%, #7c3aed 100%);
+            border-radius: 4px;
+        }
+
+        .results-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem auto;
+            max-height: 400px;
+        }
+
+        .results-header {
             display: flex;
-            align-items: flex-end; 
-            gap: 1em; /* space between model and gender dropdowns */
-            flex-wrap: wrap; /* allows responsive wrapping */
-            gap: 0.5em
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .model-group {
-            flex: 1; 
+        .results-header h3 {
+            margin: 0;
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        .name-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.75rem;
+            max-height: 280px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .name-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .name-item:hover {
+            background: var(--accent-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+        }
+
+        .custom-notice {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.2);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--error-color);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+
+        .form-row > div {
+            flex: 1;
             min-width: 200px;
         }
 
-        .gender-group {
-            flex: 0.29; /* Smaller width */
-            min-width: 100px;
+        .form-row .gender-group {
+            flex: 0.4;
+            min-width: 120px;
         }
 
+        /* Custom scrollbar */
+        .name-grid::-webkit-scrollbar {
+            width: 6px;
+        }
 
+        .name-grid::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+
+        .name-grid::-webkit-scrollbar-thumb {
+            background: var(--accent-color);
+            border-radius: 3px;
+        }
+
+        .name-grid::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-hover);
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                margin: 1rem;
+            }
+            
+            .header-section h1 {
+                font-size: 2rem;
+            }
+            
+            .form-row {
+                flex-direction: column;
+            }
+            
+            .form-row > div {
+                min-width: auto;
+            }
+            
+            .name-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+
+        .card, .form-control, .form-section, .header-section, .custom-names-container, .main-container {
+            border-radius: 0 !important;
+        }
     </style>
-
 </head>
 <body>
-    <h1>Fantasy Name Prospector</h1>
-    <!-- Main Form -->
-    <form method="POST" action="/generate" id="name-generator-form">
-        <!-- Model and Gender Selection in One Row -->
-        <div class="form-group flex-row">
-            <!-- Model Dropdown -->
-            <div class="model-group">
-                <label for="model">Select a Model:</label>
-                <select id="model" name="model">
-                    <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>American Names (New Age)</option>
-                    <option value="arabic" {% if selected_model == 'arabic' %}selected{% endif %}>Arabic Names</option>
-                    <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese Names</option>
-                    <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French Names</option>
-                    <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German Names</option>
-                    <option value="greek" {% if selected_model == 'greek' %}selected{% endif %}>Greek Names</option>
-                    <option value="russian" {% if selected_model == 'russian' %}selected{% endif %}>Russian Names</option>
-                    <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>Input Your Own Names</option>
-                </select>
+    <div class="container-fluid">
+        <div class="main-container">
+            <!-- Header Section -->
+            <div class="header-section">
+                <h1>Fantasy Name Prospector</h1>
+                <p class="subtitle">Generate new magical names from various cultures and custom datasets</p>
             </div>
 
-            <!-- Gender Dropdown -->
-            <div class="gender-group">
-                <label for="gender">Gender:</label>
-                <select id="gender" name="gender">
-                    <option value="neutral" selected>Neutral</option>
-                    <option value="female">Female</option>
-                    <option value="male">Male</option>
-                </select>
+            <!-- Main Form Section -->
+            <div class="form-section">
+                <form method="POST" action="/generate" id="name-generator-form">
+                    <!-- Model and Gender Selection -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <label for="model" class="form-label">Select a Model</label>
+                            <select id="model" name="model" class="form-select">
+                                <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>American Names (New Age)</option>
+                                <option value="arabic" {% if selected_model == 'arabic' %}selected{% endif %}>Arabic Names</option>
+                                <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese Names</option>
+                                <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French Names</option>
+                                <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German Names</option>
+                                <option value="greek" {% if selected_model == 'greek' %}selected{% endif %}>Greek Names</option>
+                                <option value="russian" {% if selected_model == 'russian' %}selected{% endif %}>Russian Names</option>
+                                <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>Input Your Own Names</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="gender" class="form-label">Gender</label>
+                            <select id="gender" name="gender" class="form-select">
+                                <option value="neutral" selected>Neutral</option>
+                                <option value="female">Female</option>
+                                <option value="male">Male</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Custom Names Input -->
+                    <div id="custom-names-container" class="mb-4" style="display: none;">
+                        <label for="custom_names" class="form-label">Enter Your Custom Names</label>
+                        <textarea id="custom_names" name="custom_names" rows="8" class="form-control" 
+                                  placeholder="Enter names here...&#10;one per line...&#10;like this..."></textarea>
+                        <div id="custom-notice" class="custom-notice" style="display: none;">
+                            <i class="bi bi-info-circle"></i> <strong>Note:</strong> Custom names take longer to process as the AI needs to learn from your examples.
+                        </div>
+                    </div>
+
+                    <!-- Parameters Row -->
+                    <div class="row mb-4">
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <label for="temperature" class="form-label">Temperature</label>
+                            <input type="number" id="temperature" name="temperature" class="form-control" 
+                                   placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" value="1.0" required>
+                            <div class="form-text">Higher = more creative</div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <label for="prefix" class="form-label">Prefix <span class="text-muted">(Optional)</span></label>
+                            <input type="text" id="prefix" name="prefix" class="form-control" 
+                                   placeholder="A, Aa, Aaa..." value="{{ prefix }}">
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <label for="length" class="form-label">Length <span class="text-muted">(Optional)</span></label>
+                            <input type="number" id="length" name="length" class="form-control" 
+                                   placeholder="default: 6" min="1" value="{{ length }}">
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <label for="count" class="form-label">Count</label>
+                            <select id="count" name="count" class="form-select">
+                                <option value="1">1</option>
+                                <option value="5">5</option>
+                                <option value="10" selected>10</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Error Message -->
+                    <div id="error-message" class="error-message" style="display:none;">
+                        <i class="bi bi-exclamation-triangle"></i> Prefix text cannot be longer than name length.
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="text-center">
+                        <button id="generate-button" type="submit" class="btn btn-primary btn-lg me-2">
+                            <i class="bi bi-play-fill"></i> Generate Names
+                        </button>
+                        <button id="train-button" type="submit" class="btn btn-success btn-lg" style="display:none;">
+                            <i class="bi bi-cpu"></i> Train Model
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Loading Section -->
+                <div id="loading" class="loading-section" style="display:none;">
+                    <div class="d-flex align-items-center justify-content-center mb-3">
+                        <div class="spinner-border text-primary me-2" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span id="loading-text" class="fs-5">Preparing...</span>
+                    </div>
+                    <div class="progress">
+                        <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
-         <!-- Custom Names Input Field (Initially hidden) -->
-         <div id="custom-names-container" class="form-group">
-            <label for="custom_names">Enter Your Custom Names (one per line):</label>
-            <textarea id="custom_names" name="custom_names" rows="10" placeholder="Enter names here...&#10line...&#10by...&#10line..."></textarea>
-            <!-- Custom Names Notice About Long Computation-->
-            <div id="custom-notice">
-            *Note: It takes much longer to generate your custom names.
+        <!-- Generated Names Results -->
+        {% if generated_names %}
+        <div class="d-flex justify-content-center">
+            <div class="main-container results-section" style="max-width: 900px; width: 100%;">
+                <div class="results-header">
+                    <h3>Generated Names</h3>
+                    <span class="badge bg-primary">{{ generated_names|length }} names</span>
+                </div>
+                <div class="name-grid" id="generated-name-grid">
+                    {% for name in generated_names %}
+                    <div class="name-item">{{ name }}</div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-
-        
-    
-        <!-- Temperature, Prefix, and Length Options -->
-        <div class="form-group flex-container">
-            <div>
-                <label for="temperature">Temperature (creativity):</label>
-                <input type="number" id="temperature" name="temperature" placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1"
-                value="1.0" required>
-            </div>
-            <div>
-                <label for="prefix">Prefix Characters <span style="color: #a1a1a1;">(Optional)</span>:</label>
-                <input type="text" id="prefix" name="prefix" placeholder="A, Aa, Aaa, ..." value="{{ prefix }}">
-            </div>
-            <div>
-                <label for="length">Name Length <span style="color: #a1a1a1;">(Optional)</span>:</label>
-                <input type="number" id="length" name="length" placeholder="default: 6" min="1" value="{{ length }}">
-            </div>
-            <!-- Generate Count Dropdown -->
-            <div class="form-group dropdown-inline">
-                <label for="count">Number of Names to Generate:</label>
-                <select id="count" name="count">
-                    <option value="1">1</option>
-                    <option value="5">5</option>
-                    <option value="10" selected>10</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                </select>
-            </div>
-        </div>
-
-    
-        <!-- Execution Button with Error Messages -->
-        <div class="button-container">
-            <!-- Prefix and Length Error Message Display -->
-            <div id="error-message" class="error-message" style="display:none; min-height:1.5em;">Prefix text cannot be longer than name length.</div>
-            <div class="form-group">
-                <button id="generate-button" button type="submit" class="submit-button">Generate</button>
-                <button id="train-button" button type="submit" class="submit-button" style="display:none;">Train</button>
-            </div>
-        </div>
-
-
-        <div id="loading" style="display:none; margin-top: 20px; text-align: center;">
-            <p id="loading-text">Preparing...</p>
-            <progress id="progress-bar" value="0" max="100" style="width: 100%; height: 20px;"></progress>
-        </div>
-    </form>
-    
-
-    <!-- Generated Names -->
-    {% if generated_names %}
-    <div class="result">
-        <h2>Generated Names:</h2>
-        <ul id="generated-name-list">
-        {% for name in generated_names %}
-            <li>{{ name }}</li>
-        {% endfor %}
-        </ul>
+        {% endif %}
     </div>
-    {% endif %}
 
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.19.0/js/md5.min.js"></script>
 
     <script>
-
         // Main form
         const form = document.getElementById('name-generator-form');
 
@@ -245,8 +439,6 @@
         const loadingDiv = document.getElementById('loading');
         const loadingText = document.getElementById('loading-text');
         const progressBar = document.getElementById('progress-bar');
-        const resultDiv = document.createElement('div');
-        resultDiv.className = 'result';
 
         // References to the form fields for dynamic type box
         const modelSelect = document.getElementById('model');
@@ -260,13 +452,12 @@
         // Track the last custom text that was successfully trained
         let lastTrainedCustomText = '';
 
-                
         // Add this function after your existing variable declarations
         function updateLengthPlaceholder() {
             const selectedModel = modelSelect.value;
 
             if (selectedModel === 'custom') {
-                lengthInput.placeholder = 'default: 6'; // Default for custom models
+                lengthInput.placeholder = 'default: 6';
                 return;
             }
 
@@ -279,15 +470,12 @@
                 })
                 .catch(error => {
                     console.log('Error fetching avg_length:', error);
-                    lengthInput.placeholder = 'default: 6'; // fallback
+                    lengthInput.placeholder = 'default: 6';
                 });
         }
 
         // Add event listener for model selection changes
         modelSelect.addEventListener('change', function() {
-            // Your existing model change logic here (if any)
-            
-            // Update the length placeholder
             updateLengthPlaceholder();
         });
 
@@ -300,22 +488,18 @@
                 const currentCustomText = customNamesText.value.trim();
                 
                 if (!currentCustomText) {
-                    // No text entered, show disabled train button
                     trainButton.style.display = 'inline-block';
                     trainButton.disabled = true;
                     generateButton.style.display = 'none';
                 } else if (currentCustomText === lastTrainedCustomText && lastTrainedCustomText !== '') {
-                    // Same text as last trained, show generate
                     trainButton.style.display = 'none';
                     generateButton.style.display = 'inline-block';
                     generateButton.disabled = false;
                 } else {
-                    // Different text, need to check if model exists or show train
-                    trainButton.disabled = false; // Enable train button for valid text
+                    trainButton.disabled = false;
                     checkIfModelExistsDebounced();
                 }
             } else {
-                // Non-custom model selected, always show generate
                 trainButton.style.display = 'none';
                 generateButton.style.display = 'inline-block';
                 generateButton.disabled = false;
@@ -344,33 +528,33 @@
 
         // Add event listener to validate inputs when the form is submitted
         form.addEventListener('submit', function(event) {
-            event.preventDefault(); //Prevent normal form submission
+            event.preventDefault();
 
-            //Validate inputs
+            // Validate inputs
             const prefixText = prefixInput.value;
             const nameLength = parseInt(lengthInput.value);
             const customNamesTextValue = customNamesText.value.trim();
 
             if (prefixText.length > nameLength) {
-                errorMessage.style.display = 'block'; // Show error message
-
+                errorMessage.style.display = 'block';
                 prefixInput.classList.add('input-error');
                 lengthInput.classList.add('input-error');
                 return;
             } else {
-                errorMessage.style.display = 'none'; // Hide error message if valid
+                errorMessage.style.display = 'none';
                 prefixInput.classList.remove('input-error');
                 lengthInput.classList.remove('input-error');
             }
 
-             // Show loading elements
+            // Show loading elements
             loadingDiv.style.display = 'block';
             loadingText.textContent = 'Preparing...';
-            progressBar.value = 0;
+            progressBar.style.width = '0%';
         
             // Remove any previous results
-            if (document.querySelector('.result')) {
-                document.querySelector('.result').remove();
+            const existingResults = document.querySelector('.results-section');
+            if (existingResults) {
+                existingResults.remove();
             }
         
             // Get form data
@@ -398,7 +582,7 @@
                             if (line.startsWith('data:')) {
                                 try {
                                     const jsonData = JSON.parse(line.substring(5).trim());
-                                    console.log("Received event data:", jsonData); //debug line
+                                    console.log("Received event data:", jsonData);
 
                                     // Update loading information for ALL event types
                                     if (jsonData.message) {
@@ -406,7 +590,7 @@
                                     }
                         
                                     if (jsonData.progress !== undefined) {
-                                        progressBar.value = jsonData.progress;
+                                        progressBar.style.width = jsonData.progress + '%';
                                     }
                         
                                     // Handle different event types
@@ -414,38 +598,60 @@
                                         case 'preparing':
                                         case 'loading':
                                         case 'training':
-                                            // Update UI for these streaming states
                                             loadingDiv.style.display = 'block';
                                             break;
                                             
                                         case 'generating':
-                                            // Update UI for generating state
                                             loadingDiv.style.display = 'block';
                                             
                                             // Create results container if it doesn't exist
-                                            let nameList = document.getElementById('generated-name-list');
-                                            if (!nameList) {
-                                                // Create the results div and name list
-                                                resultDiv.innerHTML = `
-                                                    <h2>Generated Names:</h2>
-                                                    <ul id="generated-name-list">
-                                                    </ul>
+                                            let resultsContainer = document.querySelector('.results-section');
+                                            if (!resultsContainer) {
+                                                resultsContainer = document.createElement('div');
+                                                resultsContainer.className = 'main-container results-section';
+                                                resultsContainer.innerHTML = `
+                                                    <div class="results-header">
+                                                        <h3>Generated Names</h3>
+                                                        <span class="badge bg-primary" id="name-count">0 names</span>
+                                                    </div>
+                                                    <div class="name-grid" id="generated-name-grid">
+                                                    </div>
                                                 `;
-                                                document.body.appendChild(resultDiv);
-                                                nameList = document.getElementById('generated-name-list');
+                                                document.querySelector('.container-fluid').appendChild(resultsContainer);
                                             }
                                             
                                             // Add new name if provided
                                             if (jsonData.name) {
-                                                const li = document.createElement('li');
-                                                li.textContent = jsonData.name;
-                                                nameList.appendChild(li);
+                                                const nameGrid = document.getElementById('generated-name-grid');
+                                                const nameItem = document.createElement('div');
+                                                nameItem.className = 'name-item';
+                                                nameItem.textContent = jsonData.name;
+                                                
+                                                // Add click to copy functionality
+                                                nameItem.addEventListener('click', function() {
+                                                    navigator.clipboard.writeText(jsonData.name).then(() => {
+                                                        // Brief visual feedback
+                                                        const originalBg = nameItem.style.backgroundColor;
+                                                        nameItem.style.backgroundColor = '#28a745';
+                                                        setTimeout(() => {
+                                                            nameItem.style.backgroundColor = originalBg;
+                                                        }, 200);
+                                                    });
+                                                });
+                                                
+                                                nameGrid.appendChild(nameItem);
+                                                
+                                                // Update count
+                                                const countBadge = document.getElementById('name-count');
+                                                if (countBadge) {
+                                                    const currentCount = nameGrid.children.length;
+                                                    countBadge.textContent = `${currentCount} names`;
+                                                }
                                             }
                                             break;
                                             
                                         case 'training_complete':
                                             loadingText.textContent = "Training complete! Starting name generation...";
-                                            // Update the last trained text and switch button
                                             if (modelSelect.value === 'custom') {
                                                 lastTrainedCustomText = customNamesText.value.trim();
                                                 trainButton.style.display = 'none';
@@ -454,22 +660,25 @@
                                             break;
                                 
                                         case 'complete':
-                                            // Hide loading elements
                                             loadingDiv.style.display = 'none';
                                             
-                                            // If we haven't created the results div yet (shouldn't happen with streaming)
-                                            // create it with all names at once
-                                            if (!document.querySelector('.result')) {
-                                                resultDiv.innerHTML = `
-                                                    <h2>Generated Names:</h2>
-                                                    <ul>
-                                                        ${jsonData.names.map(name => `<li>${name}</li>`).join('')}
-                                                    </ul>
+                                            // If we haven't created the results div yet
+                                            let finalResultsContainer = document.querySelector('.results-section');
+                                            if (!finalResultsContainer) {
+                                                finalResultsContainer = document.createElement('div');
+                                                finalResultsContainer.className = 'main-container results-section';
+                                                finalResultsContainer.innerHTML = `
+                                                    <div class="results-header">
+                                                        <h3>Generated Names</h3>
+                                                        <span class="badge bg-primary">${jsonData.names.length} names</span>
+                                                    </div>
+                                                    <div class="name-grid">
+                                                        ${jsonData.names.map(name => `<div class="name-item" onclick="navigator.clipboard.writeText('${name}')">${name}</div>`).join('')}
+                                                    </div>
                                                 `;
-                                                document.body.appendChild(resultDiv);
+                                                document.querySelector('.container-fluid').appendChild(finalResultsContainer);
                                             }
                                             
-                                            // If this was a training + generation cycle, update the trained text
                                             if (modelSelect.value === 'custom' && trainButton.style.display !== 'none') {
                                                 lastTrainedCustomText = customNamesText.value.trim();
                                                 updateButtonVisibility();
@@ -498,7 +707,7 @@
             });
         });
 
-        //Function for finding MD5 hash
+        // Function for finding MD5 hash
         function hashCustomNames(text) {
             const hashHex = md5(text);
             return `custom_${hashHex}`;
@@ -517,13 +726,11 @@
                 const customNamesTextValue = customNamesText.value.trim();
 
                 if (model !== 'custom' || !customNamesTextValue) {
-                    // Not custom model or no names entered yet
                     return;
                 }
 
                 const hashedModelName = hashCustomNames(customNamesTextValue);
-
-                console.log("Expected model filename:", hashedModelName);  // <-- Debug print
+                console.log("Expected model filename:", hashedModelName);
 
                 fetch('/check_model_exists?model=' + encodeURIComponent(hashedModelName))
                     .then(response => response.json())
@@ -531,7 +738,7 @@
                         const modelExists = data.exists;
 
                         if (modelExists) {
-                            lastTrainedCustomText = customNamesTextValue; // Mark as trained
+                            lastTrainedCustomText = customNamesTextValue;
                             trainButton.style.display = 'none';
                             generateButton.style.display = 'inline-block';
                         } else {
@@ -541,7 +748,6 @@
                     })
                     .catch(err => {
                         console.error("Error checking model:", err);
-                        // Default to Train in error case for custom models
                         trainButton.style.display = 'inline-block';
                         generateButton.style.display = 'none';
                     });
@@ -550,7 +756,6 @@
 
         // Run initial check
         checkIfModelExistsDebounced();
-
     </script>
 </body>
 </html>
