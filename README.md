@@ -38,4 +38,5 @@ These models are not currently available but are high priority:
 * Thai
 
 ### How it Works 
-The language patterns are learned by an LSTM-based model that is trained to learn bidirectional patterns and bigram commonality. 
+The language patterns are learned by an LSTM-based model that is trained to learn bidirectional patterns and bigram commonality. After this, the model knows which characters to pick based on a sub-portion of a generated name. 
+Name generation is tinkered by many generation parameters, many of which the user controls, such as Gender, Temperature, Prefix, and Length. There are also other parameters controlling penalties on ending trigrams, hyphens, and capital letters. 
