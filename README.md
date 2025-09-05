@@ -21,6 +21,7 @@ There are two ways to create a model:
 ### List of Existing Models
 
 The website currently has these pretrained models that can be used to generate names:
+* Classic American
 * New Age American
 * French
 * German
@@ -28,12 +29,13 @@ The website currently has these pretrained models that can be used to generate n
 * Greek
 * Russian
 * Arabic
+* Aztec
 
 These models are not currently available but are high priority:
-* Classic American
 * Roman
 * Spanish
 * Japanese 
+* Thai
 
 ### How it Works 
 The language patterns are learned by an LSTM-based model that is trained to learn bidirectional patterns and bigram commonality. 

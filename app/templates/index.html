@@ -313,9 +313,11 @@
                         <div class="col-md-8">
                             <label for="model" class="form-label">Select a Model</label>
                             <select id="model" name="model" class="form-select">
+                                <option value="classic_american" {% if selected_model == 'classic_american' %}selected{% endif %}>American (Classic)</option>
                                 <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>American (New Age)</option>
                                 <option value="arabic" {% if selected_model == 'arabic' %}selected{% endif %}>Arabic</option>
-                                <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Mandarin</option>
+                                <option value="aztec" {% if selected_model == 'aztec' %}selected{% endif %}>Aztec</option>
+                                <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese</option>
                                 <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French</option>
                                 <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German</option>
                                 <option value="greek" {% if selected_model == 'greek' %}selected{% endif %}>Greek</option>
