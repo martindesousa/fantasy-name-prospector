@@ -5,8 +5,8 @@ import os
 from collections import Counter
 from app.fng_model import BigramPenaltyLoss
 
-# Global cache for ending distributions
-_ending_distributions = {}
+# Global cache for trigram data
+_trigram_endings = {}
 
 def load_model_data(model_name='my_model'):
     if model_name.startswith('custom'):
@@ -55,9 +55,8 @@ def get_avg_length(model_name):
         return 6, True  # Default fallback
 
 def analyze_training_data(model_name, custom_names):
-    """Analyze training data to get gender proportions and ending patterns."""
+    """Analyze training data to get gender proportions."""
     gender_stats = {"<F>": [], "<M>": [], "<N>": []}
-    gender_ending_chars = {"<F>": Counter(), "<M>": Counter(), "<N>": Counter()}
     
     if custom_names:
         names_to_analyze = custom_names
@@ -74,48 +73,72 @@ def analyze_training_data(model_name, custom_names):
                 "<M>": ["John", "Mike", "David"] * 1000, 
                 "<N>": ["Riley", "Alex", "Jordan"] * 300
             }
-            default_endings = {
-                "<F>": Counter({'a': 3000, 'e': 1500, 'n': 500, 'h': 300, 'y': 200}),
-                "<M>": Counter({'n': 2000, 'e': 1500, 'r': 800, 'd': 600, 'l': 400, 's': 300}),
-                "<N>": Counter({'n': 600, 'r': 300, 'l': 200, 'y': 150, 'x': 100})
-            }
-            return default_stats, default_endings
+            return default_stats
 
     
-    # Parse names and categorize by gender, collect ending characters
+    # Parse names and categorize by gender
     for name in names_to_analyze:
         name = name.strip()
         if not name:
             continue
             
         clean_name = None
-        gender_token = None
 
         if name.startswith('<F>'):
             clean_name = name[3:].strip()
-            gender_token = "<F>"
             if clean_name:
                 gender_stats["<F>"].append(clean_name)
         elif name.startswith('<M>'):
             clean_name = name[3:].strip()
-            gender_token = "<M>"
             if clean_name:
                 gender_stats["<M>"].append(clean_name)
         elif name.startswith('<N>'):
             clean_name = name[3:].strip()
-            gender_token = "<N>"
             if clean_name:
                 gender_stats["<N>"].append(clean_name)
         else:
             # Names without gender tags go to neutral
-            clean_name = name
             gender_stats["<N>"].append(name)
-        
-        # Collect ending characters for natural ending distribution
-        if clean_name and len(clean_name) > 0 and gender_token:
-            gender_ending_chars[gender_token][clean_name[-1].lower()] += 1
 
-    return gender_stats, gender_ending_chars
+    return gender_stats
+
+def analyze_trigram_endings(model_name, custom_names):
+    """Analyze training data to extract valid ending trigrams."""
+    cache_key = f"{model_name}_trigrams"
+    
+    if cache_key in _trigram_endings:
+        return _trigram_endings[cache_key]
+    
+    ending_trigrams = set()
+    
+    if custom_names:
+        names_to_analyze = custom_names
+    else:
+        # Load from textfile for pretrained models
+        textfile_path = os.path.join('app', 'textfiles', f"{model_name}_names.txt")
+        try:
+            with open(textfile_path, 'r', encoding='utf-8') as f:
+                names_to_analyze = [line.strip() for line in f if line.strip()]
+        except FileNotFoundError:
+            # Return no trigrams for fallback
+            return {}
+    
+    # Extract ending trigrams from all names
+    for name in names_to_analyze:
+        name = name.strip()
+        if not name:
+            continue
+        
+        # Remove gender tokens
+        clean_name = name.replace('<F>', '').replace('<M>', '').replace('<N>', '').strip()
+        
+        # Extract ending trigram (last 3 characters)
+        if len(clean_name) >= 3:
+            ending_trigram = clean_name[-3:].lower()
+            ending_trigrams.add(ending_trigram)
+    
+    _trigram_endings[cache_key] = ending_trigrams
+    return ending_trigrams
 
 def calculate_gender_probabilities(gender_stats, gender_preference):
     """Calculate gender token probabilities based on training data and user preference."""
@@ -175,54 +198,6 @@ def prepare_first_letter_distribution(gender_stats, prefix_text, temperature):
     
     return {'use_prefix': False, 'letters': letters, 'probabilities': probabilities}
 
-def prepare_ending_distribution(gender_ending_chars, selected_genders, char_to_idx, temperature):
-    """Prepare gender-specific ending character distribution with caching."""
-    # Create cache key based on selected genders, character vocab, and temperature
-    gender_key = "_".join(sorted(selected_genders))
-    vocab_key = hash(tuple(sorted(char_to_idx.keys())))
-    cache_key = f"{gender_key}_{vocab_key}_{temperature}"
-    
-    if cache_key in _ending_distributions:
-        return _ending_distributions[cache_key]
-    
-    # Combine ending characters from selected genders
-    combined_endings = Counter()
-    for gender in selected_genders:
-        if gender in gender_ending_chars:
-            combined_endings.update(gender_ending_chars[gender])
-    
-    if not combined_endings:
-        # Fallback based on selected genders
-        if "<F>" in selected_genders and "<M>" not in selected_genders:
-            # Female-only fallback
-            combined_endings = Counter({'a': 25, 'e': 20, 'h': 10, 'n': 8, 'y': 8, 'l': 5, 'r': 4})
-        elif "<M>" in selected_genders and "<F>" not in selected_genders:
-            # Male-only fallback
-            combined_endings = Counter({'n': 20, 'e': 15, 'r': 12, 'd': 10, 'l': 8, 's': 8, 't': 5, 'h': 2})
-        else:
-            # Mixed or neutral fallback
-            combined_endings = Counter({'a': 20, 'e': 18, 'n': 15, 'r': 10, 'l': 8, 's': 8, 'h': 6, 'y': 6, 't': 4, 'd': 3, 'x': 2})
-    
-    # Filter to only characters in our vocabulary
-    valid_endings = {char: count for char, count in combined_endings.items() if char in char_to_idx}
-    
-    if not valid_endings:
-        _ending_distributions[cache_key] = None
-        return None
-    
-    # Create probability distribution
-    chars = list(valid_endings.keys())
-    counts = np.array([valid_endings[char] for char in chars], dtype=np.float32)
-    
-    # Apply temperature
-    logits = np.log(counts + 1e-8) / temperature
-    probabilities = np.exp(logits)
-    probabilities /= probabilities.sum()
-    
-    result = {'chars': chars, 'probabilities': probabilities, 'char_indices': [char_to_idx[c] for c in chars]}
-    _ending_distributions[cache_key] = result
-    return result
-
 def calculate_hyphen_penalty(current_pos, target_length, base_penalty=5.0):
     """Calculate hyphen penalty based on position relative to end of name."""
     chars_from_end = target_length - current_pos
@@ -236,7 +211,26 @@ def calculate_hyphen_penalty(current_pos, target_length, base_penalty=5.0):
     else:
         return base_penalty  # Normal penalty for middle of name
 
-def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature, ending_distribution=None):
+def calculate_trigram_penalty(current_name, candidate_char, valid_trigrams, trigram_penalty=20.0):
+    """Calculate penalty for characters that would create invalid ending trigrams."""
+    if len(current_name) < 2:
+        return 0.0  # Need at least 2 chars to form a trigram
+    
+    # Get the last 2 characters and combine with candidate to form trigram
+    last_two = current_name[-2:]
+    potential_trigram = (last_two + candidate_char).lower()
+    
+    # Remove any gender tokens or spaces from the trigram check
+    clean_trigram = potential_trigram.replace('<', '').replace('>', '').replace(' ', '')
+    
+    if len(clean_trigram) >= 3:
+        ending_trigram = clean_trigram[-3:]
+        if ending_trigram not in valid_trigrams:
+            return trigram_penalty
+    
+    return 0.0
+
+def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature, valid_trigrams=None):
     """Generate a single name using the provided configuration."""
     # Choose gender token
     chosen_gender_token = np.random.choice(gender_probs['tokens'], p=gender_probs['probabilities'])
@@ -274,15 +268,16 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
         
         # Apply different logic based on position
         if chars_remaining == 1:
-            # Last character - use 70/30 blend if ending distribution exists, otherwise normal sampling
+            # Last character - apply trigram validation
             prev_char = name[-1] if name else None
             next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char, 
-                                            is_final_char=True, ending_distribution=ending_distribution)
+                                            is_final_char=True, current_name=name, valid_trigrams=valid_trigrams)
         else:
             # Not the last character - apply hyphen penalties and normal sampling
             prev_char = name[-1] if name else None
             next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char,
-                                            position_from_end=chars_remaining, target_length=target_length)
+                                            position_from_end=chars_remaining, target_length=target_length,
+                                            current_name=name, valid_trigrams=valid_trigrams)
         
         # Skip unwanted characters
         if should_skip_character(next_char, name, chosen_gender_token):
@@ -294,54 +289,44 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
     return clean_generated_name(name)
 
 def sample_next_character(predictions, idx_to_char, temperature, prev_char=None, capital_penalty=2.0, 
-                         position_from_end=None, target_length=None, is_final_char=False, ending_distribution=None):
-    """Sampling with capital letter penalties, position-aware penalties, and ending logic."""
+                         position_from_end=None, target_length=None, is_final_char=False,
+                         current_name=None, valid_trigrams=None, trigram_penalty=3.0):
+    """Sampling with capital letter penalties, position-aware penalties, and trigram validation."""
     
-    if is_final_char and ending_distribution:
-        # For final character, strongly prefer natural endings
-        ending_probs = np.zeros_like(predictions)
-        for i, char_idx in enumerate(ending_distribution['char_indices']):
-            if char_idx < len(ending_probs):
-                ending_probs[char_idx] = ending_distribution['probabilities'][i]
-
-        # Blend with model predictions (40% ending distribution, 60% model)
-        blended_probs = 0.1 * ending_probs + 0.9 * predictions
-        blended_probs /= np.sum(blended_probs)
-        
-        if temperature == 0:
-            predicted_index = np.argmax(blended_probs)
-        else:
-            logits = np.log(blended_probs + 1e-8) / temperature
-            probs = np.exp(logits)
-            probs /= np.sum(probs)
-            predicted_index = np.random.choice(len(probs), p=probs)
+    # Standard character sampling with penalties
+    if temperature == 0:
+        logits = np.log(predictions + 1e-8)
     else:
-        # Normal character sampling with penalties
-        if temperature == 0:
-            logits = np.log(predictions + 1e-8)
-        else:
-            logits = np.log(predictions + 1e-8) / temperature
+        logits = np.log(predictions + 1e-8) / temperature
 
-        # Apply capital letter penalty (avoid capitals mid-name)
+    # Apply capital letter penalty (avoid capitals mid-name)
+    for i in range(len(logits)):
+        char = idx_to_char[i]
+        if char.isupper() and prev_char not in (None, '-', '<', '>', ' '):
+            logits[i] -= capital_penalty
+    
+    # Apply hyphen penalties based on position
+    if position_from_end is not None and target_length is not None:
+        hyphen_chars = ['-']
+        current_pos = target_length - position_from_end + 1
+        hyphen_penalty = calculate_hyphen_penalty(current_pos, target_length)
+        
         for i in range(len(logits)):
             char = idx_to_char[i]
-            if char.isupper() and prev_char not in (None, '-', '<', '>', ' '):
-                logits[i] -= capital_penalty
-        
-        # Apply hyphen penalties based on position
-        if position_from_end is not None and target_length is not None:
-            hyphen_chars = ['-']
-            current_pos = target_length - position_from_end + 1
-            hyphen_penalty = calculate_hyphen_penalty(current_pos, target_length)
-            
-            for i in range(len(logits)):
-                char = idx_to_char[i]
-                if char in hyphen_chars:
-                    logits[i] -= hyphen_penalty
+            if char in hyphen_chars:
+                logits[i] -= hyphen_penalty
+    
+    # Apply trigram penalty for final characters
+    if valid_trigrams and current_name and is_final_char:
+        for i in range(len(logits)):
+            char = idx_to_char[i]
+            penalty = calculate_trigram_penalty(current_name, char, valid_trigrams, trigram_penalty)
+            if penalty > 0:
+                logits[i] -= penalty
 
-        probs = np.exp(logits)
-        probs /= np.sum(probs)
-        predicted_index = np.random.choice(len(probs), p=probs)
+    probs = np.exp(logits)
+    probs /= np.sum(probs)
+    predicted_index = np.random.choice(len(probs), p=probs)
     
     return idx_to_char[predicted_index]
 
@@ -371,12 +356,10 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
         return
 
     # Prepare configurations
-    gender_stats, gender_ending_chars = analyze_training_data(model_name, custom_names)
+    gender_stats = analyze_training_data(model_name, custom_names)
+    valid_trigrams = analyze_trigram_endings(model_name, custom_names)
     gender_probs = calculate_gender_probabilities(gender_stats, gender)
     first_letter_info = prepare_first_letter_distribution(gender_stats, prefix_text, temperature)
-
-    selected_genders = gender_probs['tokens']
-    ending_distribution = prepare_ending_distribution(gender_ending_chars, selected_genders, char_to_idx, temperature)
 
     # Use provided length or fall back to model's average length
     target_length = int(length) if length is not None and length != '' else avg_length
@@ -390,7 +373,8 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
         attempts += 1
 
         # Generate a single name
-        name = generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature, ending_distribution)
+        name = generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, 
+                                   target_length, temperature, valid_trigrams)
         
         if name and len(name) == target_length and name not in generated_names:
             generated_names.add(name)
