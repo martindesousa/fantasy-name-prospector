@@ -294,6 +294,58 @@
         .card, .form-control, .form-section, .header-section, .custom-names-container, .main-container {
             border-radius: 0 !important;
         }
+        /* Toggle Button Styles (from new design) */
+        .model-type-toggle {
+            display: flex;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .toggle-option {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .toggle-option.active {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .toggle-option:hover:not(.active) {
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .toggle-option i {
+            font-size: 1.1rem;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            min-height: 120px;
+        }
+
+        .tab-pane {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -308,43 +360,68 @@
             <!-- Main Form Section -->
             <div class="form-section">
                 <form method="POST" action="/generate" id="name-generator-form">
-                    <!-- Model and Gender Selection -->
-                    <div class="row mb-4">
-                        <div class="col-md-8">
-                            <label for="model" class="form-label">Select a Model</label>
-                            <select id="model" name="model" class="form-select">
-                                <option value="classic_american" {% if selected_model == 'classic_american' %}selected{% endif %}>American (Classic)</option>
-                                <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>American (New Age)</option>
-                                <option value="arabic" {% if selected_model == 'arabic' %}selected{% endif %}>Arabic</option>
-                                <option value="aztec" {% if selected_model == 'aztec' %}selected{% endif %}>Aztec</option>
-                                <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese</option>
-                                <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French</option>
-                                <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German</option>
-                                <option value="greek" {% if selected_model == 'greek' %}selected{% endif %}>Greek</option>
-                                <option value="russian" {% if selected_model == 'russian' %}selected{% endif %}>Russian</option>
-                                <option value="spanish" {% if selected_model == 'spanish' %}selected{% endif %}>Spanish</option>
-                                <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>CUSTOM</option>
-                            </select>
+                    <!-- Model Type Toggle (merged visual) -->
+                    <label class="form-label">Model Type</label>
+                    <div class="model-type-toggle">
+                        <button type="button" class="toggle-option active" data-target="template-tab" data-type="template">
+                            <i class="bi bi-collection"></i>
+                            Templates
+                        </button>
+                        <button type="button" class="toggle-option" data-target="custom-tab" data-type="custom">
+                            <i class="bi bi-pencil-square"></i>
+                            Custom
+                        </button>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content mb-4">
+                        <!-- Template Tab -->
+                        <div id="template-tab" class="tab-pane active">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <label for="model" class="form-label">Select a Model</label>
+                                    <select id="model" name="model" class="form-select">
+                                        <option value="classic_american" {% if selected_model == 'classic_american' %}selected{% endif %}>American (Classic)</option>
+                                        <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>American (New Age)</option>
+                                        <option value="arabic" {% if selected_model == 'arabic' %}selected{% endif %}>Arabic</option>
+                                        <option value="aztec" {% if selected_model == 'aztec' %}selected{% endif %}>Aztec</option>
+                                        <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese</option>
+                                        <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French</option>
+                                        <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German</option>
+                                        <option value="greek" {% if selected_model == 'greek' %}selected{% endif %}>Greek</option>
+                                        <option value="russian" {% if selected_model == 'russian' %}selected{% endif %}>Russian</option>
+                                        <option value="spanish" {% if selected_model == 'spanish' %}selected{% endif %}>Spanish</option>
+                                        <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>CUSTOM</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="gender" class="form-label">Gender</label>
+                                    <select id="gender" name="gender" class="form-select">
+                                        <option value="neutral" selected>Neutral</option>
+                                        <option value="female">Female</option>
+                                        <option value="male">Male</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-4">
-                            <label for="gender" class="form-label">Gender</label>
-                            <select id="gender" name="gender" class="form-select">
-                                <option value="neutral" selected>Neutral</option>
-                                <option value="female">Female</option>
-                                <option value="male">Male</option>
-                            </select>
+
+                        <!-- Custom Tab -->
+                        <div id="custom-tab" class="tab-pane">
+                            <div class="row">
+                                <div id="custom-names-container" class="col-12" style="display:none;">
+                                    <label for="custom_names" class="form-label">Enter Your Custom Names</label>
+                                    <textarea id="custom_names" name="custom_names" rows="8" class="form-control" 
+                                              placeholder="Enter names here...&#10;one per line...&#10;like this..."></textarea>
+                                    <div id="custom-notice" class="custom-notice" style="display: none;">
+                                        <i class="bi bi-info-circle"></i> <strong>Note:</strong> Custom names take longer to process as the AI needs to learn from your examples.
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Custom Names Input -->
-                    <div id="custom-names-container" class="mb-4" style="display: none;">
-                        <label for="custom_names" class="form-label">Enter Your Custom Names</label>
-                        <textarea id="custom_names" name="custom_names" rows="8" class="form-control" 
-                                  placeholder="Enter names here...&#10;one per line...&#10;like this..."></textarea>
-                        <div id="custom-notice" class="custom-notice" style="display: none;">
-                            <i class="bi bi-info-circle"></i> <strong>Note:</strong> Custom names take longer to process as the AI needs to learn from your examples.
-                        </div>
-                    </div>
+                    <!-- Hidden field to track which type is active (visual helper) -->
+                    <input type="hidden" id="model-type" name="model_type" value="template">
 
                     <!-- Parameters Row -->
                     <div class="row mb-4">
@@ -759,6 +836,60 @@
 
         // Run initial check
         checkIfModelExistsDebounced();
+
+        // --- Toggle UI behavior (merged from new code) ---
+        const toggleButtons = document.querySelectorAll('.toggle-option');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+        const modelTypeInput = document.getElementById('model-type');
+        const templateTab = document.getElementById('template-tab');
+        const customTab = document.getElementById('custom-tab');
+
+        // Remember last selected template model so we can restore when switching back
+        let lastTemplateModel = document.getElementById('model').value || 'classic_american';
+
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Reset active classes
+                toggleButtons.forEach(btn => btn.classList.remove('active'));
+                tabPanes.forEach(pane => pane.classList.remove('active'));
+
+                // Activate clicked
+                button.classList.add('active');
+                const targetId = button.getAttribute('data-target');
+                const target = document.getElementById(targetId);
+                if (target) target.classList.add('active');
+
+                // Update hidden field
+                const type = button.getAttribute('data-type');
+                modelTypeInput.value = type;
+
+                // If switched to custom, mark the underlying model select to 'custom'
+                if (type === 'custom') {
+                    // store last template model
+                    lastTemplateModel = document.getElementById('model').value;
+                    document.getElementById('model').value = 'custom';
+                    customNamesContainer.style.display = 'block';
+                    customNotice.style.display = 'block';
+                } else {
+                    // restore template model
+                    document.getElementById('model').value = lastTemplateModel;
+                    if (document.getElementById('model').value !== 'custom') {
+                        customNamesContainer.style.display = 'none';
+                        customNotice.style.display = 'none';
+                    }
+                }
+
+                // Update buttons visibility
+                updateButtonVisibility();
+            });
+        });
+
+        // Ensure custom tab shows textarea if model is custom on load
+        if (document.getElementById('model').value === 'custom') {
+            // Activate custom toggle button
+            const customBtn = Array.from(toggleButtons).find(b => b.getAttribute('data-type') === 'custom');
+            if (customBtn) customBtn.click();
+        }
     </script>
 </body>
 </html>
