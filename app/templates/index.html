@@ -407,14 +407,34 @@
 
                         <!-- Custom Tab -->
                         <div id="custom-tab" class="tab-pane">
-                            <div class="row">
-                                <div id="custom-names-container" class="col-12" style="display:none;">
-                                    <label for="custom_names" class="form-label">Enter Your Custom Names</label>
-                                    <textarea id="custom_names" name="custom_names" rows="8" class="form-control" 
-                                              placeholder="Enter names here...&#10;one per line...&#10;like this..."></textarea>
-                                    <div id="custom-notice" class="custom-notice" style="display: none;">
-                                        <i class="bi bi-info-circle"></i> <strong>Note:</strong> Custom names take longer to process as the AI needs to learn from your examples.
-                                    </div>
+                            <div class="row mb-3">
+                                <div class="col-md-8">
+                                    <label for="custom-model" class="form-label">Custom Models</label>
+                                    <select id="custom-model" name="custom_model_select" class="form-select">
+                                        <option value="">Create new custom model...</option>
+                                        <option value="custom_fantasy_heroes">Fantasy Heroes (Custom)</option>
+                                        <option value="custom_sci_fi">Sci-Fi Names (Custom)</option>
+                                        <option value="custom_royal_names">Royal Names (Custom)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="gender-custom" class="form-label">Gender</label>
+                                    <select id="gender-custom" name="gender" class="form-select">
+                                        <option value="neutral" selected>Neutral</option>
+                                        <option value="female">Female</option>
+                                        <option value="male">Male</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Custom Names Input (shown when "Create new" is selected or no selection) -->
+                            <div id="custom-names-input">
+                                <label for="custom_names" class="form-label">Enter Your Custom Names</label>
+                                <textarea id="custom_names" name="custom_names" rows="6" class="form-control" 
+                                          placeholder="Enter names here...&#10;one per line...&#10;like this..."></textarea>
+                                <div class="custom-notice">
+                                    <i class="bi bi-info-circle"></i> 
+                                    <strong>Note:</strong> Custom names take longer to process as the AI needs to learn from your examples.
                                 </div>
                             </div>
                         </div>
