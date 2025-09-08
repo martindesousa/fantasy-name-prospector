@@ -76,7 +76,7 @@ def stream_progress():
         length = request.form['length']
         if length:
             length = int(length)
-        epochs = 50
+        epochs = 15
         
         # Clear any old messages from the queue
         while not progress_queue.empty():
