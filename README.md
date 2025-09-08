@@ -30,12 +30,14 @@ The website currently has these pretrained models that can be used to generate n
 * Russian
 * Arabic
 * Aztec
+* Spanish
 
 These models are not currently available but are high priority:
 * Roman
-* Spanish
 * Japanese 
 * Thai
+* English
+* Hawaiian
 
 ### How it Works 
 The language patterns are learned by an LSTM-based model that is trained to learn bidirectional patterns and bigram commonality. After this, the model knows which characters to pick based on a sub-portion of a generated name. 
