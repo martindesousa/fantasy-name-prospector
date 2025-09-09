@@ -1,5 +1,3 @@
-// Extracted JS from index.html for readability. Keep behavior identical.
-
 // Main form
 const form = document.getElementById('name-generator-form');
 
@@ -382,6 +380,8 @@ toggleButtons.forEach(button => {
 
             if (customNamesContainer) customNamesContainer.style.display = 'block';
             if (customNotice) customNotice.style.display = 'block';
+            // Run the debounced check immediately when switching to custom mode
+            checkIfModelExistsDebounced();
         } else {
             // restore template model
             const hidden = document.getElementById('model-hidden');
