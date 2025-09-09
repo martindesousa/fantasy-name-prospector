@@ -23,7 +23,6 @@
 <M> Amethyst
 <M> Ananias
 <M> Andreas
-<M> Andrew
 <M> Angel
 <M> Aniketos
 <M> Anius
@@ -97,8 +96,6 @@
 <M> Cyd
 <M> Cyril
 <M> Damásos
-<M> Damian
-<M> Damien
 <M> Damon
 <M> Dard
 <M> Deioces
@@ -117,7 +114,6 @@
 <M> Dracon
 <M> Dunixi
 <M> Echo
-<M> Egypt
 <M> Eliud
 <M> Endymion
 <M> Erasmus
@@ -141,8 +137,6 @@
 <M> Georgios
 <M> Gerasimos
 <M> Gethsemane
-<M> Greg
-<M> Gregg
 <M> Gregory
 <M> Gryphon
 <M> Hades
@@ -209,8 +203,6 @@
 <M> Nestor
 <M> Nicander
 <M> Nicanor
-<M> Nicholas
-<M> Nick
 <M> Nicodemus
 <M> Nicolas
 <M> Nike
@@ -943,7 +935,6 @@
 <F> Aero
 <F> Alexis
 <F> Amethyst
-<M> Angel
 <F> Anstice
 <M> Ares
 <M> Arius
@@ -971,7 +962,6 @@
 <M> Doric
 <F> Dunixi
 <F> Echo
-<F> Egypt
 <M> Eridian
 <F> Eureka
 <M> Eurus
