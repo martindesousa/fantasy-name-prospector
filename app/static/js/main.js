@@ -27,6 +27,11 @@ let lastTrainedCustomText = '';
 function updateLengthPlaceholder() {
     const visualMode = document.getElementById('model-type') ? document.getElementById('model-type').value : null;
     const selectedModel = visualMode === 'custom' ? 'custom' : modelSelect.value;
+    // Only update the placeholder when the user has selected Average mode.
+    const mode = lengthModeSelect ? lengthModeSelect.value : null;
+    if (mode !== 'average') {
+        return;
+    }
 
     if (selectedModel === 'custom') {
         lengthInput.placeholder = 'default: 6';
@@ -37,7 +42,10 @@ function updateLengthPlaceholder() {
         .then(response => response.json())
         .then(data => {
             const prefix = data.is_default ? 'default: ' : 'average: ';
+            // Use placeholder so we don't overwrite user's field when in auto/custom
             lengthInput.placeholder = prefix + data.avg_length;
+            // Clear any accidental value
+            if (lengthInput.type !== 'number') lengthInput.value = '';
         })
         .catch(error => {
             console.log('Error fetching avg_length:', error);
@@ -53,15 +61,43 @@ modelSelect.addEventListener('change', function() {
 // Update placeholder on page load
 updateLengthPlaceholder();
 
-// Enable/disable length input based on mode
+// Enable/disable length input based on mode - unified textbox
 if (lengthModeSelect) {
     lengthModeSelect.addEventListener('change', function() {
-        if (this.value === 'custom') {
-            lengthInput.disabled = false;
-        } else {
+        const mode = this.value;
+        if (mode === 'auto') {
+            lengthInput.type = 'text';
+            lengthInput.value = '';
+            lengthInput.placeholder = 'automatic';
             lengthInput.disabled = true;
+            lengthInput.removeAttribute('name');
+        } else if (mode === 'average') {
+            lengthInput.type = 'text';
+            lengthInput.disabled = true;
+            lengthInput.removeAttribute('name');
+            const visualMode = document.getElementById('model-type') ? document.getElementById('model-type').value : null;
+            const selectedModel = visualMode === 'custom' ? 'custom' : modelSelect.value;
+            fetch(`/get_model_avg_length?model=${selectedModel}`)
+                .then(r => r.json())
+                .then(data => {
+                    const prefix = data.is_default ? 'default: ' : 'average: ';
+                    lengthInput.placeholder = prefix + data.avg_length;
+                })
+                .catch(err => {
+                    lengthInput.placeholder = 'average: 21';
+                });
+        } else if (mode === 'custom') {
+            lengthInput.type = 'number';
+            lengthInput.value = '';
+            lengthInput.placeholder = 'Enter length';
+            lengthInput.disabled = false;
+            lengthInput.name = 'length';
+            lengthInput.min = 1;
         }
     });
+
+    // Trigger initial length-mode update
+    lengthModeSelect.dispatchEvent(new Event('change'));
 }
 
 // Function to update button visibility based on model and training status

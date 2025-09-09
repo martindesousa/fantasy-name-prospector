@@ -124,15 +124,14 @@
                         <div class="col-md-3 col-sm-6 mb-3">
                             <label for="length_mode" class="form-label">Length Mode</label>
                             <select id="length_mode" name="length_mode" class="form-select">
-                                <option value="auto">Default (Model decides)</option>
-                                <option value="average" selected>Average</option>
+                                <option value="auto" selected>Auto</option>
+                                <option value="average">Average</option>
                                 <option value="custom">Custom</option>
                             </select>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <label for="length" class="form-label">Length <span class="text-muted">(Custom)</span></label>
-                            <input type="number" id="length" name="length" class="form-control" 
-                                   placeholder="Enter length" min="1" value="{{ length }}" disabled>
+                                <label for="length" class="form-label">Length</label>
+                                <input type="text" id="length" class="form-control" placeholder="automatic" disabled>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
                             <label for="count" class="form-label">Count</label>
