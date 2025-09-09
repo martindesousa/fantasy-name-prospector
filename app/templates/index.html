@@ -381,8 +381,8 @@
                                 <div class="col-md-8">
                                     <label for="model" class="form-label">Select a Model</label>
                                     <select id="model" name="model" class="form-select">
-                                        <option value="classic_american" {% if selected_model == 'classic_american' %}selected{% endif %}>American (Classic)</option>
-                                        <option value="new_age_american" {% if selected_model == 'new_age_american' %}selected{% endif %}>American (New Age)</option>
+                                        <option value="american_classic" {% if selected_model == 'american_classic' %}selected{% endif %}>American (Classic)</option>
+                                        <option value="american_new_age" {% if selected_model == 'american_new_age' %}selected{% endif %}>American (New Age)</option>
                                         <option value="arabic" {% if selected_model == 'arabic' %}selected{% endif %}>Arabic</option>
                                         <option value="aztec" {% if selected_model == 'aztec' %}selected{% endif %}>Aztec</option>
                                         <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese</option>
@@ -457,9 +457,17 @@
                                    placeholder="A, Aa, Aaa..." value="{{ prefix }}">
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <label for="length" class="form-label">Length <span class="text-muted">(Optional)</span></label>
+                            <label for="length_mode" class="form-label">Length Mode</label>
+                            <select id="length_mode" name="length_mode" class="form-select">
+                                <option value="auto">Default (Model decides)</option>
+                                <option value="average" selected>Average</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <label for="length" class="form-label">Length <span class="text-muted">(Custom)</span></label>
                             <input type="number" id="length" name="length" class="form-control" 
-                                   placeholder="default: 6" min="1" value="{{ length }}">
+                                   placeholder="Enter length" min="1" value="{{ length }}" disabled>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
                             <label for="count" class="form-label">Count</label>
@@ -532,7 +540,8 @@
 
         // References to the form fields for dynamic error message
         const prefixInput = document.getElementById('prefix');
-        const lengthInput = document.getElementById('length');
+    const lengthInput = document.getElementById('length');
+    const lengthModeSelect = document.getElementById('length_mode');
         const errorMessage = document.getElementById('error-message');
 
         // References to loading elements
@@ -554,7 +563,9 @@
 
         // Add this function after your existing variable declarations
         function updateLengthPlaceholder() {
-            const selectedModel = modelSelect.value;
+            // If visual mode is custom, show default placeholder
+            const visualMode = document.getElementById('model-type') ? document.getElementById('model-type').value : null;
+            const selectedModel = visualMode === 'custom' ? 'custom' : modelSelect.value;
 
             if (selectedModel === 'custom') {
                 lengthInput.placeholder = 'default: 6';
@@ -581,6 +592,17 @@
 
         // Update placeholder on page load
         updateLengthPlaceholder();
+
+        // Enable/disable length input based on mode
+        if (lengthModeSelect) {
+            lengthModeSelect.addEventListener('change', function() {
+                if (this.value === 'custom') {
+                    lengthInput.disabled = false;
+                } else {
+                    lengthInput.disabled = true;
+                }
+            });
+        }
 
         // Function to update button visibility based on model and training status
         function updateButtonVisibility() {
@@ -632,10 +654,11 @@
 
             // Validate inputs
             const prefixText = prefixInput.value;
-            const nameLength = parseInt(lengthInput.value);
+            const lengthMode = lengthModeSelect ? lengthModeSelect.value : 'average';
+            const nameLength = lengthMode === 'custom' ? parseInt(lengthInput.value) : null;
             const customNamesTextValue = customNamesText.value.trim();
 
-            if (prefixText.length > nameLength) {
+            if (lengthMode === 'custom' && prefixText.length > nameLength) {
                 errorMessage.style.display = 'block';
                 prefixInput.classList.add('input-error');
                 lengthInput.classList.add('input-error');
@@ -884,16 +907,44 @@
                 modelTypeInput.value = type;
 
                 // If switched to custom, mark the underlying model select to 'custom'
+                const modelSelectEl = document.getElementById('model');
                 if (type === 'custom') {
                     // store last template model
-                    lastTemplateModel = document.getElementById('model').value;
-                    document.getElementById('model').value = 'custom';
+                    lastTemplateModel = modelSelectEl.value;
+
+                    // If the select has an option with value 'custom', set it. Otherwise create a hidden input
+                    const hasCustomOption = Array.from(modelSelectEl.options).some(o => o.value === 'custom');
+                    if (hasCustomOption) {
+                        modelSelectEl.value = 'custom';
+                    } else {
+                        // remove name from select so it doesn't submit
+                        modelSelectEl.removeAttribute('name');
+                        // add hidden input to submit model=custom
+                        let hidden = document.getElementById('model-hidden');
+                        if (!hidden) {
+                            hidden = document.createElement('input');
+                            hidden.type = 'hidden';
+                            hidden.id = 'model-hidden';
+                            hidden.name = 'model';
+                            hidden.value = 'custom';
+                            form.appendChild(hidden);
+                        } else {
+                            hidden.value = 'custom';
+                        }
+                    }
+
                     customNamesContainer.style.display = 'block';
                     customNotice.style.display = 'block';
                 } else {
                     // restore template model
-                    document.getElementById('model').value = lastTemplateModel;
-                    if (document.getElementById('model').value !== 'custom') {
+                    // remove hidden input if present and restore select name
+                    const hidden = document.getElementById('model-hidden');
+                    if (hidden) {
+                        hidden.remove();
+                        modelSelectEl.name = 'model';
+                    }
+                    modelSelectEl.value = lastTemplateModel;
+                    if (modelSelectEl.value !== 'custom') {
                         customNamesContainer.style.display = 'none';
                         customNotice.style.display = 'none';
                     }

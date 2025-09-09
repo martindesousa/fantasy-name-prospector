@@ -73,9 +73,16 @@ def stream_progress():
         count = int(request.form['count'])
         temperature = float(request.form['temperature'])
         prefix = request.form['prefix']
-        length = request.form['length']
-        if length:
-            length = int(length)
+        # length_mode: 'auto' (let model decide), 'average', 'custom'
+        length_mode = request.form.get('length_mode', 'average')
+        length = request.form.get('length', '')
+        if length and length_mode == 'custom':
+            try:
+                length = int(length)
+            except ValueError:
+                length = None
+        else:
+            length = None
         epochs = 15
         
         # Clear any old messages from the queue
@@ -174,7 +181,7 @@ def stream_progress():
         # Reset progress for name generation
         yield f"data: {json.dumps({'type': 'generating', 'message': 'Starting name generation...', 'progress': 0})}\n\n"
 
-        # Generate names 
+        # Generate names
         name_stream = fng_name_generate.generate_quality_names_stream(
             model_name=model_name,
             count=count,
@@ -182,7 +189,8 @@ def stream_progress():
             prefix_text=prefix,
             length=length,
             temperature=temperature,
-            custom_names=custom_names if selected_model == 'custom' else None
+            custom_names=custom_names if selected_model == 'custom' else None,
+            length_mode=length_mode
         )
 
         generated_names = []

@@ -29,6 +29,14 @@ def load_names(input_text=None, input_file=None):
         else:
             # Automatically add <N> tag for names without gender tags
             names.append(f"<N> {line}")
+
+    # Append explicit END token for custom input so model can learn when to stop
+    # Use a single-character token unlikely to appear in names
+    END_CHAR = '¶'
+    # If either input_text (raw text) or input_file (lines from a file) was used,
+    # append the END_CHAR once to each name so the model can learn termination.
+    if input_text or input_file:
+        names = [n + END_CHAR for n in names]
     
     return names
 
@@ -51,7 +59,6 @@ def prepare_training_data(names, char_to_idx):
         seq = [char_to_idx[char] for char in name]
         if seq:  # Only add non-empty sequences
             sequences.append(seq)
-        sequences.append(seq)
 
     X = []
     y = []
@@ -143,7 +150,7 @@ class BigramPenaltyLoss:
 def get_avg_length(names):
     # Calculate average length (without gender tokens)
     clean_lengths = [
-        len(name.replace('<F>', '').replace('<M>', '').replace('<N>', '').strip())
+    len(name.replace('<F>', '').replace('<M>', '').replace('<N>', '').replace('¶','').strip())
         for name in names
     ]
     avg_length = int(round(np.mean(clean_lengths))) if clean_lengths else 6

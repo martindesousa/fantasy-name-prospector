@@ -230,7 +230,7 @@ def calculate_trigram_penalty(current_name, candidate_char, valid_trigrams, trig
     
     return 0.0
 
-def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature, valid_trigrams=None):
+def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature, valid_trigrams=None, auto_mode=False, avg_length=6):
     """Generate a single name using the provided configuration."""
     # Choose gender token
     chosen_gender_token = np.random.choice(gender_probs['tokens'], p=gender_probs['probabilities'])
@@ -251,46 +251,74 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
     # Calculate target length accounting for gender token, space, and prefix
     gender_token_length = len(chosen_gender_token)  # e.g., "<F>" = 3 chars
     space_length = 1
-    
-    # Target total length should be gender token + space + desired name length
-    target_full_length = gender_token_length + space_length + target_length
-    
-    # Generate characters until full target length with smart ending logic
-    while len(name) < target_full_length:
-        encoded = [char_to_idx[c] for c in name if c in char_to_idx]
-        if not encoded:
-            break
+
+    # If auto_mode, we'll use heuristics to decide when to stop; otherwise use explicit target
+    if not auto_mode:
+        # Target total length should be gender token + space + desired name length
+        target_full_length = gender_token_length + space_length + target_length
+
+        # Generate characters until full target length with smart ending logic
+        while len(name) < target_full_length:
+            encoded = [char_to_idx[c] for c in name if c in char_to_idx]
+            if not encoded:
+                break
+                
+            encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
+            predictions = model.predict(encoded, verbose=0)[0]
             
-        encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
-        predictions = model.predict(encoded, verbose=0)[0]
-        
-        chars_remaining = target_full_length - len(name)
-        
-        # Apply different logic based on position
-        if chars_remaining == 1:
-            # Last character - apply trigram validation
-            prev_char = name[-1] if name else None
-            next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char, 
-                                            is_final_char=True, current_name=name, valid_trigrams=valid_trigrams)
-        else:
-            # Not the last character - apply hyphen penalties and normal sampling
+            chars_remaining = target_full_length - len(name)
+            
+            # Apply different logic based on position
+            if chars_remaining == 1:
+                # Last character - apply trigram validation
+                prev_char = name[-1] if name else None
+                next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char, 
+                                                is_final_char=True, current_name=name, valid_trigrams=valid_trigrams, avg_length=avg_length)
+            else:
+                # Not the last character - apply hyphen penalties and normal sampling
+                prev_char = name[-1] if name else None
+                next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char,
+                                                position_from_end=chars_remaining, target_length=target_length,
+                                                current_name=name, valid_trigrams=valid_trigrams, avg_length=avg_length)
+
+            # Skip unwanted characters
+            if should_skip_character(next_char, name, chosen_gender_token):
+                continue
+                
+            name += next_char
+    else:
+        # Auto mode: rely only on model sampling. Stop when the explicit END char is sampled
+        # or when a hard upper bound is reached to avoid runaway generation.
+        max_cap = max(12, int(avg_length * 2) + 4)
+
+        while len(name) < (gender_token_length + space_length + max_cap):
+            encoded = [char_to_idx[c] for c in name if c in char_to_idx]
+            if not encoded:
+                break
+
+            encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
+            predictions = model.predict(encoded, verbose=0)[0]
+
             prev_char = name[-1] if name else None
             next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char,
-                                            position_from_end=chars_remaining, target_length=target_length,
-                                            current_name=name, valid_trigrams=valid_trigrams)
-        
-        # Skip unwanted characters
-        if should_skip_character(next_char, name, chosen_gender_token):
-            continue
-            
-        name += next_char
-    
+                                              position_from_end=None, target_length=None,
+                                              current_name=name, valid_trigrams=valid_trigrams, avg_length=avg_length)
+
+            if should_skip_character(next_char, name, chosen_gender_token):
+                # Skip invalid/undesirable chars but do not apply heuristics beyond that
+                continue
+
+            # If model outputs the explicit END character, stop generation
+            if next_char == '¶' or next_char == '<END>':
+                break
+
+            name += next_char
     # Clean and return the name
     return clean_generated_name(name)
 
 def sample_next_character(predictions, idx_to_char, temperature, prev_char=None, capital_penalty=2.0, 
                          position_from_end=None, target_length=None, is_final_char=False,
-                         current_name=None, valid_trigrams=None, trigram_penalty=3.0):
+                         current_name=None, valid_trigrams=None, trigram_penalty=3.0, avg_length=None, end_boost=0.75):
     """Sampling with capital letter penalties, position-aware penalties, and trigram validation."""
     
     # Standard character sampling with penalties
@@ -324,6 +352,21 @@ def sample_next_character(predictions, idx_to_char, temperature, prev_char=None,
             if penalty > 0:
                 logits[i] -= penalty
 
+    # Slightly boost the logit for an explicit END token if present and we've reached avg_length
+    try:
+        END_CHAR = '¶'
+        if avg_length and current_name:
+            # compute core name length excluding gender tokens and spaces
+            core_name = current_name.replace('<F>', '').replace('<M>', '').replace('<N>', '').replace(' ', '')
+            if len(core_name) >= avg_length:
+                # find end char index and boost its logit slightly
+                for i in range(len(logits)):
+                    if idx_to_char[i] == END_CHAR:
+                        logits[i] += end_boost
+                        break
+    except Exception:
+        pass
+
     probs = np.exp(logits)
     probs /= np.sum(probs)
     predicted_index = np.random.choice(len(probs), p=probs)
@@ -344,10 +387,10 @@ def should_skip_character(char, current_name, gender_token):
 
 def clean_generated_name(raw_name):
     """Clean the generated name by removing gender tokens."""
-    cleaned = raw_name.replace('<F>', '').replace('<M>', '').replace('<N>', '').strip()
+    cleaned = raw_name.replace('<F>', '').replace('<M>', '').replace('<N>', '').replace('¶','').strip()
     return cleaned if cleaned else None
 
-def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None):
+def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None, length_mode='average'):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
     try:
         model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = load_model_data(model_name)
@@ -361,8 +404,16 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
     gender_probs = calculate_gender_probabilities(gender_stats, gender)
     first_letter_info = prepare_first_letter_distribution(gender_stats, prefix_text, temperature)
 
-    # Use provided length or fall back to model's average length
-    target_length = int(length) if length is not None and length != '' else avg_length
+    # Determine target_length and auto_mode based on length_mode
+    if length_mode == 'custom' and length is not None:
+        target_length = int(length)
+        auto_mode = False
+    elif length_mode == 'average':
+        target_length = avg_length
+        auto_mode = False
+    else:
+        target_length = None
+        auto_mode = True
     
     generated_names = set()
     yielded = 0
@@ -373,10 +424,21 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
         attempts += 1
 
         # Generate a single name
-        name = generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, 
-                                   target_length, temperature, valid_trigrams)
-        
-        if name and len(name) == target_length and name not in generated_names:
-            generated_names.add(name)
-            yielded += 1
-            yield name
+        name = generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info,
+                                   target_length, temperature, valid_trigrams, auto_mode=auto_mode, avg_length=avg_length)
+
+        if not name:
+            continue
+
+        if auto_mode:
+            # accept any non-empty generated name
+            if name not in generated_names:
+                generated_names.add(name)
+                yielded += 1
+                yield name
+        else:
+            # require exact length match for non-auto modes
+            if target_length is not None and len(name) == target_length and name not in generated_names:
+                generated_names.add(name)
+                yielded += 1
+                yield name
