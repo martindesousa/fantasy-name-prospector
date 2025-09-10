@@ -159,6 +159,11 @@ body {
     border-radius: 4px;
 }
 
+/* Make progress updates sharp (no smooth transition) */
+.progress-bar {
+    transition: none !important;
+}
+
 .results-section {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
