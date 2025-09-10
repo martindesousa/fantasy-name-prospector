@@ -1,6 +1,9 @@
 import numpy as np
-import tensorflow as tf
-import pickle
+try:
+    import tensorflow as tf
+except Exception:
+    tf = None
+import json
 import os
 from collections import Counter
 from app.fng_model import BigramPenaltyLoss
@@ -11,48 +14,55 @@ _trigram_endings = {}
 def load_model_data(model_name='my_model'):
     if model_name.startswith('custom'):
         model_path = f'app/models/custom/{model_name}.keras'
-        data_path = f'app/models/custom/{model_name}_data.pkl'
+        data_path = f'app/models/custom/{model_name}_data.json'
     else:
         model_path = f'app/models/{model_name}.keras'
-        data_path = f'app/models/{model_name}_data.pkl'
+        data_path = f'app/models/{model_name}_data.json'
 
     model = tf.keras.models.load_model(
         model_path,
         custom_objects={'BigramPenaltyLoss': BigramPenaltyLoss}
     )
 
-    with open(data_path, 'rb') as file:
-        data_dict = pickle.load(file)
-    
-    X = data_dict['X']
-    y = data_dict['y']
-    char_to_idx = data_dict['char_to_idx']
-    idx_to_char = data_dict['idx_to_char']
-    char_set = data_dict['char_set']
+    with open(data_path, 'r', encoding='utf-8') as file:
+        data_dict = json.load(file)
+
+    # Reconstruct minimal placeholders previously provided by pickle
+    X_shape = data_dict.get('X_shape') or [1, 20]
+    # Create a minimal numpy-like placeholder for X with correct shape for pad_sequences usage
+    X = np.zeros(tuple(X_shape), dtype=np.int32)
+
+    # char_to_idx may be a dict already; keep as-is
+    char_to_idx = data_dict.get('char_to_idx', {})
+    # idx_to_char stored as list -> convert to dict mapping indices
+    idx_to_char_list = data_dict.get('idx_to_char', [])
+    idx_to_char = {i: ch for i, ch in enumerate(idx_to_char_list)}
+
+    char_set = data_dict.get('char_set', [])
     bigram_counts = data_dict.get('bigram_counts', {})
-    avg_length = data_dict.get('avg_length', 6)
-    
+    avg_length = int(data_dict.get('avg_length', 6))
+
+    # y is not needed by generator; set to None for compatibility
+    y = None
+
     return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length
 
 def get_avg_length(model_name):
     """Get average length and whether it's a default or actual average."""
     try:
         if model_name.startswith('custom'):
-            data_path = f'app/models/custom/{model_name}_data.pkl'
+            data_path = f'app/models/custom/{model_name}_data.json'
         else:
-            data_path = f'app/models/{model_name}_data.pkl'
-        
-        with open(data_path, 'rb') as file:
-            data_dict = pickle.load(file)
-        
-        # Check if avg_length exists in the data
+            data_path = f'app/models/{model_name}_data.json'
+        with open(data_path, 'r', encoding='utf-8') as file:
+            data_dict = json.load(file)
+
         if 'avg_length' in data_dict:
-            return data_dict['avg_length'], False  # Actual length
+            return int(data_dict['avg_length']), False
         else:
-            return 6, True  # Default fallback
-            
+            return 6, True
     except FileNotFoundError:
-        return 6, True  # Default fallback
+        return 6, True
 
 def analyze_training_data(model_name, custom_names):
     """Analyze training data to get gender proportions."""

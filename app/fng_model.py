@@ -2,7 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import keras
-import pickle
+import json
 from collections import Counter
 
 # HELPER METHODS FOR load_data #############################################################################
@@ -221,18 +221,25 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_coun
     
 
     # Prepare and save additional data
+    # Only save JSON-serializable metadata. We don't store full X/y arrays anymore.
+    # Save X shape so generators can reconstruct an appropriate padding length.
+    x_shape = list(X.shape) if hasattr(X, 'shape') else None
+
+    # idx_to_char may have integer keys; convert to list indexed by position for JSON
+    idx_to_char_list = [idx_to_char[i] for i in range(len(idx_to_char))] if isinstance(idx_to_char, dict) else list(idx_to_char)
+
     data_dict = {
-        'X': X,
-        'y': y,
+        'X_shape': x_shape,
         'char_to_idx': char_to_idx,
-        'idx_to_char': idx_to_char,
+        'idx_to_char': idx_to_char_list,
         'char_set': char_set,
-        'bigram_counts': bigram_counts,
-        'avg_length': avg_length
+        'bigram_counts': dict(bigram_counts),
+        'avg_length': int(avg_length)
     }
 
-    with open(path + '_data.pkl', 'wb') as file:
-        pickle.dump(data_dict, file)
+    # Write JSON file (human readable, ensure Unicode preserved)
+    with open(path + '_data.json', 'w', encoding='utf-8') as file:
+        json.dump(data_dict, file, ensure_ascii=False)
 
 class TrainingProgressCallback(tf.keras.callbacks.Callback):
     def __init__(self, total_epochs, stream_progress):
