@@ -316,7 +316,7 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
     # Clean and return the name
     return clean_generated_name(name)
 
-def sample_next_character(predictions, idx_to_char, temperature, prev_char=None, capital_penalty=2.0, 
+def sample_next_character(predictions, idx_to_char, temperature, prev_char=None, capital_penalty=2.5, 
                          position_from_end=None, target_length=None, is_final_char=False,
                          current_name=None, valid_trigrams=None, trigram_penalty=3.0, avg_length=None, end_boost=0.10):
     """Sampling with capital letter penalties, position-aware penalties, and trigram validation."""
