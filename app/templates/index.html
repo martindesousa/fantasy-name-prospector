@@ -25,7 +25,7 @@
             <!-- Main Form Section -->
             <div class="form-section">
                 <form method="POST" action="/generate" id="name-generator-form">
-                    <!-- Model Type Toggle (merged visual) -->
+                    <!-- Model Type Toggle -->
                     <label class="form-label">Model Type</label>
                     <div class="model-type-toggle">
                         <button type="button" class="toggle-option active" data-target="template-tab" data-type="template">
@@ -34,7 +34,7 @@
                         </button>
                         <button type="button" class="toggle-option" data-target="custom-tab" data-type="custom">
                             <i class="bi bi-pencil-square"></i>
-                            Custom
+                            Custom Models
                         </button>
                     </div>
 
@@ -46,17 +46,16 @@
                                 <div class="col-md-8">
                                     <label for="model" class="form-label">Select a Model</label>
                                     <select id="model" name="model" class="form-select">
-                                        <option value="american_classic" {% if selected_model == 'american_classic' %}selected{% endif %}>American (Classic)</option>
-                                        <option value="american_new_age" {% if selected_model == 'american_new_age' %}selected{% endif %}>American (New Age)</option>
-                                        <option value="arabic" {% if selected_model == 'arabic' %}selected{% endif %}>Arabic</option>
-                                        <option value="aztec" {% if selected_model == 'aztec' %}selected{% endif %}>Aztec</option>
-                                        <option value="chinese" {% if selected_model == 'chinese' %}selected{% endif %}>Chinese</option>
-                                        <option value="french" {% if selected_model == 'french' %}selected{% endif %}>French</option>
-                                        <option value="german" {% if selected_model == 'german' %}selected{% endif %}>German</option>
-                                        <option value="greek" {% if selected_model == 'greek' %}selected{% endif %}>Greek</option>
-                                        <option value="russian" {% if selected_model == 'russian' %}selected{% endif %}>Russian</option>
-                                        <option value="spanish" {% if selected_model == 'spanish' %}selected{% endif %}>Spanish</option>
-                                        <option value="custom" {% if selected_model == 'custom' %}selected{% endif %}>CUSTOM</option>
+                                        <option value="american_classic">American (Classic)</option>
+                                        <option value="american_new_age">American (New Age)</option>
+                                        <option value="arabic">Arabic</option>
+                                        <option value="aztec">Aztec</option>
+                                        <option value="chinese">Chinese</option>
+                                        <option value="french">French</option>
+                                        <option value="german">German</option>
+                                        <option value="greek">Greek</option>
+                                        <option value="russian">Russian</option>
+                                        <option value="spanish">Spanish</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
@@ -70,21 +69,46 @@
                             </div>
                         </div>
 
-                        <!-- Custom Tab -->
+                        <!-- Custom Models Tab -->
                         <div id="custom-tab" class="tab-pane">
-                            <div class="row mb-3">
+                            <!-- Custom Model Manager -->
+                            <div class="custom-model-manager">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">My Custom Models</h5>
+                                    <button type="button" class="btn btn-success btn-sm" id="create-new-model-btn">
+                                        <i class="bi bi-plus-lg"></i> Create New
+                                    </button>
+                                </div>
+                                
+                                <!-- Search Bar -->
+                                <div class="model-search-container">
+                                    <input type="text" class="form-control model-search-input" 
+                                           placeholder="Search your custom models..." id="model-search">
+                                    <i class="bi bi-search search-icon"></i>
+                                </div>
+                                
+                                <!-- Custom Models List -->
+                                <div class="custom-model-list" id="custom-models-list">
+                                    <!-- Models will be populated here -->
+                                    <div class="empty-state" id="empty-state">
+                                        <i class="bi bi-folder-x"></i>
+                                        <p>No custom models yet</p>
+                                        <p class="small">Create your first custom model to get started!</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Selected Model Info -->
+                            <div class="row mb-3" id="selected-model-info" style="display: none;">
                                 <div class="col-md-8">
-                                    <label for="custom-model" class="form-label">Custom Models</label>
-                                    <select id="custom-model" name="custom_model_select" class="form-select">
-                                        <option value="">Create new custom model...</option>
-                                        <option value="custom_fantasy_heroes">Fantasy Heroes (Custom)</option>
-                                        <option value="custom_sci_fi">Sci-Fi Names (Custom)</option>
-                                        <option value="custom_royal_names">Royal Names (Custom)</option>
-                                    </select>
+                                    <label class="form-label">Selected Custom Model</label>
+                                    <div class="form-control" id="selected-model-display" readonly style="background: var(--bg-secondary);">
+                                        None selected
+                                    </div>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="gender-custom" class="form-label">Gender</label>
-                                    <select id="gender-custom" name="gender" class="form-select">
+                                    <select id="gender-custom" name="gender_custom" class="form-select">
                                         <option value="neutral" selected>Neutral</option>
                                         <option value="female">Female</option>
                                         <option value="male">Male</option>
@@ -92,21 +116,64 @@
                                 </div>
                             </div>
                             
-                            <!-- Custom Names Input (shown when "Create new" is selected or no selection) -->
-                            <div id="custom-names-input">
-                                <label for="custom_names" class="form-label">Enter Your Custom Names</label>
-                                <textarea id="custom_names" name="custom_names" rows="6" class="form-control" 
-                                          placeholder="Enter names here...&#10;one per line...&#10;like this..."></textarea>
-                                <div class="custom-notice">
-                                    <i class="bi bi-info-circle"></i> 
-                                    <strong>Note:</strong> Custom names take longer to process as the AI needs to learn from your examples.
+                            <!-- New Model Creation Section -->
+                            <div class="new-model-section" id="new-model-form" style="display: none;">
+                                <h6 class="mb-3">
+                                    <i class="bi bi-plus-circle"></i> Create New Custom Model
+                                </h6>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label for="new-model-name" class="form-label">Model Name</label>
+                                        <input type="text" id="new-model-name" class="form-control" 
+                                               placeholder="e.g., Fantasy Heroes, Sci-Fi Characters...">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="new-model-category" class="form-label">Category <span class="text-muted">(Optional)</span></label>
+                                        <select id="new-model-category" class="form-select">
+                                            <option value="fantasy">Fantasy</option>
+                                            <option value="sci-fi">Sci-Fi</option>
+                                            <option value="historical">Historical</option>
+                                            <option value="modern">Modern</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="new-model-description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
+                                    <input type="text" id="new-model-description" class="form-control" 
+                                           placeholder="Brief description of your model...">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="custom-names-input" class="form-label">Training Names</label>
+                                    <textarea id="custom-names-input" rows="6" class="form-control" 
+                                              placeholder="Enter names here (one per line)...&#10;Aragorn&#10;Legolas&#10;Gimli&#10;Gandalf&#10;..."></textarea>
+                                    <div class="custom-notice">
+                                        <i class="bi bi-info-circle"></i> 
+                                        <strong>Tip:</strong> Add at least 20 names for better results. More names = better quality!
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-success" id="save-custom-model">
+                                        <i class="bi bi-check-lg"></i> Save Model
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="cancel-new-model">
+                                        <i class="bi bi-x-lg"></i> Cancel
+                                    </button>
                                 </div>
                             </div>
+                            
+                            <!-- Status Messages -->
+                            <div id="status-messages"></div>
                         </div>
                     </div>
 
-                    <!-- Hidden field to track which type is active (visual helper) -->
+                    <!-- Hidden fields -->
                     <input type="hidden" id="model-type" name="model_type" value="template">
+                    <input type="hidden" id="selected-custom-model" name="selected_custom_model" value="">
 
                     <!-- Parameters Row -->
                     <div class="row mb-4">
@@ -119,7 +186,7 @@
                         <div class="col-md-3 col-sm-6 mb-3">
                             <label for="prefix" class="form-label">Prefix <span class="text-muted">(Optional)</span></label>
                             <input type="text" id="prefix" name="prefix" class="form-control" 
-                                   placeholder="A, Aa, Aaa..." value="{{ prefix }}">
+                                   placeholder="A, Aa, Aaa...">
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
                             <label for="length_mode" class="form-label">Length Mode</label>
@@ -130,8 +197,8 @@
                             </select>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                                <label for="length" class="form-label">Length</label>
-                                <input type="text" id="length" class="form-control" placeholder="automatic" disabled>
+                            <label for="length" class="form-label">Length</label>
+                            <input type="text" id="length" class="form-control" placeholder="automatic" disabled>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
                             <label for="count" class="form-label">Count</label>
@@ -144,19 +211,14 @@
                             </select>
                         </div>
                     </div>
-
-                    <!-- Error Message -->
-                    <div id="error-message" class="error-message" style="display:none;">
-                        <i class="bi bi-exclamation-triangle"></i> Prefix text cannot be longer than name length.
+                    <div id="error-message" class="error-message">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Error: Prefix length cannot be longer than the specified name length.
                     </div>
-
                     <!-- Action Buttons -->
                     <div class="text-center">
-                        <button id="generate-button" type="submit" class="btn btn-primary btn-lg me-2">
+                        <button id="generate-button" type="submit" class="btn btn-primary btn-lg">
                             <i class="bi bi-play-fill"></i> Generate Names
-                        </button>
-                        <button id="train-button" type="submit" class="btn btn-success btn-lg" style="display:none;">
-                            <i class="bi bi-cpu"></i> Train Model
                         </button>
                     </div>
                 </form>
@@ -175,28 +237,12 @@
                 </div>
             </div>
         </div>
-
-        <!-- Generated Names Results -->
-        {% if generated_names %}
-        <div class="d-flex justify-content-center">
-            <div class="main-container results-section" style="max-width: 900px; width: 100%;">
-                <div class="results-header">
-                    <h3>Generated Names</h3>
-                    <span class="badge bg-primary">{{ generated_names|length }} names</span>
-                </div>
-                <div class="name-grid" id="generated-name-grid">
-                    {% for name in generated_names %}
-                    <div class="name-item">{{ name }}</div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.19.0/js/md5.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}" ></script>
+    <script src="{{ url_for('static', filename='js/custom_models.js') }}" ></script>
 </body>
 </html>

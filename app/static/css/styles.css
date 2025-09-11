@@ -1,4 +1,4 @@
-/* Extracted styles from index.html to keep template concise */
+/* Styles */
 :root {
     --bg-primary: #0d1117;
     --bg-secondary: #161b22;
@@ -132,6 +132,7 @@ body {
     background: rgba(248, 81, 73, 0.1);
     border: 1px solid rgba(248, 81, 73, 0.2);
     border-radius: 8px;
+    display: none;
 }
 
 .input-error {
@@ -338,4 +339,196 @@ body {
 
 .tab-pane.active {
     display: block;
+}
+
+.custom-model-manager {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.model-search-container {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.model-search-input {
+    padding-right: 40px;
+}
+
+.search-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+.custom-model-list {
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.custom-model-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.custom-model-item:hover {
+    background: rgba(88, 166, 255, 0.1);
+}
+
+.custom-model-item.selected {
+    background: rgba(88, 166, 255, 0.2);
+    border-left: 3px solid var(--accent-color);
+}
+
+.custom-model-item:last-child {
+    border-bottom: none;
+}
+
+.model-info {
+    flex: 1;
+}
+
+.model-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.model-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.model-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-icon {
+    padding: 6px 10px;
+    font-size: 0.9rem;
+    border-radius: 6px;
+}
+
+.new-model-section {
+    background: var(--bg-tertiary);
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.new-model-section.active {
+    border-color: var(--accent-color);
+    background: rgba(88, 166, 255, 0.05);
+}
+
+.success-message {
+    background: rgba(63, 185, 80, 0.1);
+    border: 1px solid rgba(63, 185, 80, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 1rem 0;
+    color: var(--success-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: fadeInUp 0.5s ease;
+}
+
+.error-message-inline {
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid rgba(248, 81, 73, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 1rem 0;
+    color: var(--error-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(13, 17, 23, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    z-index: 10;
+}
+
+.loading-content {
+    text-align: center;
+    color: var(--text-primary);
+}
+
+.model-stats {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.stat-badge {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.custom-model-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-model-list::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+}
+
+.custom-model-list::-webkit-scrollbar-thumb {
+    background: var(--accent-color);
+    border-radius: 3px;
 }

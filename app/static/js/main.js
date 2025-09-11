@@ -73,6 +73,7 @@ if (lengthModeSelect) {
             lengthInput.removeAttribute('name');
         } else if (mode === 'average') {
             lengthInput.type = 'text';
+            lengthInput.value = '';
             lengthInput.disabled = true;
             lengthInput.removeAttribute('name');
             const visualMode = document.getElementById('model-type') ? document.getElementById('model-type').value : null;
