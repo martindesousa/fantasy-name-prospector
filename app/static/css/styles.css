@@ -1,11 +1,14 @@
 /* Styles */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
 :root {
     --bg-primary: #0d1117;
     --bg-secondary: #161b22;
     --bg-tertiary: #21262d;
     --border-color: #30363d;
     --text-primary: #f0f6fc;
-    --text-secondary: #8b949e;
+    --text-secondary: #c1cedb;
+    --header-color: #0065d8d8;
     --accent-color: #58a6ff;
     --accent-hover: #4493e0;
     --success-color: #3fb950;
@@ -14,25 +17,27 @@
 }
 
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, sans-serif;
     background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
     min-height: 100vh;
     color: var(--text-primary);
 }
 
+/* Sharp edges for most containers */
 .main-container {
     background: rgba(33, 38, 45, 0.8);
     backdrop-filter: blur(10px);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
+    border-radius: 0; /* Sharp edges */
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     margin: 2rem auto;
     max-width: 1000px;
 }
 
 .header-section {
-    background: linear-gradient(135deg, var(--accent-color) 0%, #7c3aed 100%);
-    border-radius: 16px 16px 0 0;
+    font-family: 'K2D', -apple-system, sans-serif;
+    background: var(--header-color);
+    border-radius: 0; /* Sharp edges */
     padding: 2rem;
     text-align: center;
     position: relative;
@@ -46,8 +51,8 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
-    opacity: 0.3;
+    background: url('/static/images/TheBanner2.png');
+    opacity: 0.15;
 }
 
 .header-section h1 {
@@ -57,6 +62,7 @@ body {
     color: white;
     position: relative;
     z-index: 2;
+    letter-spacing: -0.02em; /* Tighter letter spacing for Space Grotesk */
 }
 
 .header-section .subtitle {
@@ -72,11 +78,12 @@ body {
     padding: 2rem;
 }
 
+/* Sharp edges for form controls */
 .form-control, .form-select {
     background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
-    border-radius: 8px;
+    border-radius: 0; /* Sharp edges */
     transition: all 0.3s ease;
 }
 
@@ -93,10 +100,11 @@ body {
     margin-bottom: 0.5rem;
 }
 
+/* Keep rounded edges for buttons */
 .btn-primary {
     background: linear-gradient(135deg, var(--accent-color) 0%, #4493e0 100%);
     border: none;
-    border-radius: 8px;
+    border-radius: 8px; /* Keep rounded */
     font-weight: 500;
     padding: 0.75rem 2rem;
     transition: all 0.3s ease;
@@ -111,7 +119,7 @@ body {
 .btn-success {
     background: linear-gradient(135deg, var(--success-color) 0%, #2ea043 100%);
     border: none;
-    border-radius: 8px;
+    border-radius: 8px; /* Keep rounded */
     font-weight: 500;
     padding: 0.75rem 2rem;
     transition: all 0.3s ease;
@@ -131,7 +139,7 @@ body {
     padding: 0.5rem;
     background: rgba(248, 81, 73, 0.1);
     border: 1px solid rgba(248, 81, 73, 0.2);
-    border-radius: 8px;
+    border-radius: 0; /* Sharp edges */
     display: none;
 }
 
@@ -143,7 +151,7 @@ body {
 .loading-section {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 0; /* Sharp edges */
     padding: 2rem;
     margin: 2rem 0;
     text-align: center;
@@ -152,12 +160,12 @@ body {
 .progress {
     height: 8px;
     background-color: var(--bg-tertiary);
-    border-radius: 4px;
+    border-radius: 0; /* Sharp edges */
 }
 
 .progress-bar {
     background: linear-gradient(90deg, var(--accent-color) 0%, #7c3aed 100%);
-    border-radius: 4px;
+    border-radius: 0; /* Sharp edges */
 }
 
 /* Make progress updates sharp (no smooth transition) */
@@ -168,7 +176,7 @@ body {
 .results-section {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 0; /* Sharp edges */
     padding: 2rem;
     margin: 2rem auto;
     max-height: 400px;
@@ -187,6 +195,7 @@ body {
     margin: 0;
     color: var(--accent-color);
     font-weight: 600;
+    letter-spacing: -0.01em;
 }
 
 .name-grid {
@@ -201,7 +210,7 @@ body {
 .name-item {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 6px; /* Keep slightly rounded for name badges */
     padding: 0.75rem 1rem;
     text-align: center;
     font-weight: 500;
@@ -219,7 +228,7 @@ body {
 .custom-notice {
     background: rgba(248, 81, 73, 0.1);
     border: 1px solid rgba(248, 81, 73, 0.2);
-    border-radius: 8px;
+    border-radius: 0; /* Sharp edges */
     padding: 0.75rem;
     margin-top: 0.5rem;
     font-size: 0.875rem;
@@ -250,12 +259,12 @@ body {
 
 .name-grid::-webkit-scrollbar-track {
     background: var(--bg-tertiary);
-    border-radius: 3px;
+    border-radius: 0;
 }
 
 .name-grid::-webkit-scrollbar-thumb {
     background: var(--accent-color);
-    border-radius: 3px;
+    border-radius: 0;
 }
 
 .name-grid::-webkit-scrollbar-thumb:hover {
@@ -284,15 +293,11 @@ body {
     }
 }
 
-.card, .form-control, .form-section, .header-section, .custom-names-container, .main-container {
-    border-radius: 0 !important;
-}
-
-/* Toggle Button Styles (from new design) */
+/* Toggle Button Styles - keep rounded for buttons */
 .model-type-toggle {
     display: flex;
     background: var(--bg-tertiary);
-    border-radius: 8px;
+    border-radius: 8px; /* Keep rounded for button-like elements */
     overflow: hidden;
     border: 1px solid var(--border-color);
     margin-bottom: 1.5rem;
@@ -344,7 +349,7 @@ body {
 .custom-model-manager {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 0; /* Sharp edges */
     padding: 1.5rem;
     margin-bottom: 1.5rem;
 }
@@ -371,7 +376,7 @@ body {
     max-height: 250px;
     overflow-y: auto;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 0; /* Sharp edges */
     background: var(--bg-secondary);
 }
 
@@ -405,6 +410,7 @@ body {
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 2px;
+    letter-spacing: -0.01em;
 }
 
 .model-meta {
@@ -420,13 +426,13 @@ body {
 .btn-icon {
     padding: 6px 10px;
     font-size: 0.9rem;
-    border-radius: 6px;
+    border-radius: 6px; /* Keep some rounding for small buttons */
 }
 
 .new-model-section {
     background: var(--bg-tertiary);
     border: 2px dashed var(--border-color);
-    border-radius: 12px;
+    border-radius: 0; /* Sharp edges */
     padding: 1.5rem;
     margin-top: 1rem;
     transition: all 0.3s ease;
@@ -440,7 +446,7 @@ body {
 .success-message {
     background: rgba(63, 185, 80, 0.1);
     border: 1px solid rgba(63, 185, 80, 0.3);
-    border-radius: 8px;
+    border-radius: 0; /* Sharp edges */
     padding: 12px;
     margin: 1rem 0;
     color: var(--success-color);
@@ -453,7 +459,7 @@ body {
 .error-message-inline {
     background: rgba(248, 81, 73, 0.1);
     border: 1px solid rgba(248, 81, 73, 0.3);
-    border-radius: 8px;
+    border-radius: 0; /* Sharp edges */
     padding: 12px;
     margin: 1rem 0;
     color: var(--error-color);
@@ -484,7 +490,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 12px;
+    border-radius: 0; /* Sharp edges */
     z-index: 10;
 }
 
@@ -502,7 +508,7 @@ body {
 .stat-badge {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: 4px; /* Keep slight rounding for badges */
     padding: 2px 8px;
     font-size: 0.75rem;
     color: var(--text-secondary);
@@ -525,10 +531,10 @@ body {
 
 .custom-model-list::-webkit-scrollbar-track {
     background: var(--bg-tertiary);
-    border-radius: 3px;
+    border-radius: 0;
 }
 
 .custom-model-list::-webkit-scrollbar-thumb {
     background: var(--accent-color);
-    border-radius: 3px;
+    border-radius: 0;
 }
