@@ -1,7 +1,7 @@
 // Main form
 const form = document.getElementById('name-generator-form');
 
-// References to the form fields for dynamic error message
+// References to the main form fields
 const prefixInput = document.getElementById('prefix');
 const lengthInput = document.getElementById('length');
 const lengthModeSelect = document.getElementById('length_mode');
@@ -12,7 +12,62 @@ const loadingDiv = document.getElementById('loading');
 const loadingText = document.getElementById('loading-text');
 const progressBar = document.getElementById('progress-bar');
 
-// References to the form fields for dynamic type box
+// Reference to the inline spinner (Swap this out on errors)
+let spinnerEl = loadingDiv ? loadingDiv.querySelector('.spinner-border') : null;
+
+// Create a fresh spinner element (so we can restore it after showing the warning image)
+function createSpinner() {
+    const s = document.createElement('div');
+    s.className = 'spinner-border text-primary me-2';
+    s.setAttribute('role', 'status');
+    const span = document.createElement('span');
+    span.className = 'visually-hidden';
+    span.textContent = 'Loading...';
+    s.appendChild(span);
+    return s;
+}
+
+// Function to show the warning image in place of the spinner
+function showWarningImage() {
+    if (!loadingDiv) return;
+    // avoid duplicating
+    if (loadingDiv.querySelector('#loading-warning-image')) return;
+
+    // remove any existing spinner
+    const existingSpinner = loadingDiv.querySelector('.spinner-border');
+    if (existingSpinner) existingSpinner.remove();
+
+    // create img
+    const img = document.createElement('img');
+    img.id = 'loading-warning-image';
+    img.src = '/static/images/WarningSign.webp';
+    img.alt = 'Warning';
+    // size similar to spinner
+    img.style.width = '2rem';
+    img.style.height = '2rem';
+    img.style.objectFit = 'contain';
+    img.style.marginRight = '0.5rem';
+
+    // insert before the loading text
+    const textNode = loadingDiv.querySelector('#loading-text');
+    if (textNode) textNode.parentNode.insertBefore(img, textNode);
+}
+
+// Function to restore spinner (remove warning image if present and ensure spinner exists)
+function restoreSpinner() {
+    if (!loadingDiv) return;
+    const warning = loadingDiv.querySelector('#loading-warning-image');
+    if (warning) warning.remove();
+
+    const existingSpinner = loadingDiv.querySelector('.spinner-border');
+    if (!existingSpinner) {
+        const textNode = loadingDiv.querySelector('#loading-text');
+        const newSpinner = createSpinner();
+        if (textNode) textNode.parentNode.insertBefore(newSpinner, textNode);
+    }
+}
+
+// References to the custom form fields
 const modelSelect = document.getElementById('model');
 const customNamesContainer = document.getElementById('custom-names-input') || document.getElementById('custom-names-container');
 const customNotice = document.getElementById('custom-notice');
@@ -168,6 +223,8 @@ form.addEventListener('submit', function(event) {
     loadingDiv.style.display = 'block';
     loadingText.textContent = 'Preparing...';
     progressBar.style.width = '0%';
+    // ensure spinner visible (in case previous action showed the warning image)
+    restoreSpinner();
 
     const existingResults = document.querySelector('.results-section');
     if (existingResults) existingResults.remove();
@@ -210,10 +267,14 @@ form.addEventListener('submit', function(event) {
                                 case 'loading':
                                 case 'training':
                                     loadingDiv.style.display = 'block';
+                                    // ensure spinner is visible if previously replaced
+                                    restoreSpinner();
                                     break;
+                                // 'preparing' handled above together with loading/training
 
                                 case 'generating':
                                     loadingDiv.style.display = 'block';
+                                    restoreSpinner();
 
                                     let resultsContainer = document.querySelector('.results-section');
                                     if (!resultsContainer) {
@@ -258,6 +319,8 @@ form.addEventListener('submit', function(event) {
 
                                 case 'training_complete':
                                     loadingText.textContent = "Training complete! Starting name generation...";
+                                    // make sure spinner is present when moving to generation
+                                    restoreSpinner();
                                     if (modelSelect.value === 'custom') {
                                         lastTrainedCustomText = customNamesText.value.trim();
                                         trainButton.style.display = 'none';
@@ -293,10 +356,15 @@ form.addEventListener('submit', function(event) {
                                 case 'error':
                                     loadingText.textContent = "Error: " + jsonData.message;
                                     loadingDiv.style.display = 'block';
+                                    // replace spinner with warning image
+                                    showWarningImage();
                                     break;
                             }
                         } catch (e) {
                             console.error('Error parsing SSE data:', e);
+                            // show warning image for parsing/stream issues
+                            loadingText.textContent = 'Error: stream parsing failed';
+                            showWarningImage();
                         }
                     }
                 });
@@ -309,6 +377,7 @@ form.addEventListener('submit', function(event) {
     }).catch(error => {
         console.error('Fetch error:', error);
         loadingText.textContent = 'Error: ' + error.message;
+        showWarningImage();
     });
 });
 

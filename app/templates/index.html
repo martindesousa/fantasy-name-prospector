@@ -85,7 +85,7 @@
                                 <!-- Search Bar -->
                                 <div class="model-search-container">
                                     <input type="text" class="form-control model-search-input" 
-                                           placeholder="Search your custom models..." id="model-search">
+                                           placeholder="Search" id="model-search">
                                     <i class="bi bi-search search-icon"></i>
                                 </div>
                                 
@@ -100,26 +100,8 @@
                                 </div>
                             </div>
                             
-                            <!-- Selected Model Info -->
-                            <div class="row mb-3" id="selected-model-info" style="display: none;">
-                                <div class="col-md-8">
-                                    <label class="form-label">Selected Custom Model</label>
-                                    <div class="form-control" id="selected-model-display" readonly style="background: var(--bg-secondary);">
-                                        None selected
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="gender-custom" class="form-label">Gender</label>
-                                    <select id="gender-custom" name="gender_custom" class="form-select">
-                                        <option value="neutral" selected>Neutral</option>
-                                        <option value="female">Female</option>
-                                        <option value="male">Male</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <!-- New Model Creation Section -->
-                            <div class="new-model-section" id="new-model-form" style="display: none;">
+                            <!-- New Model Creation Section (keep above selected model) -->
+                            <div class="new-model-section mb-3" id="new-model-form" style="display: none;">
                                 <h6 class="mb-3">
                                     <i class="bi bi-plus-circle"></i> Create New Custom Model
                                 </h6>
@@ -127,18 +109,12 @@
                                 <div class="row mb-3">
                                     <div class="col-md-8">
                                         <label for="new-model-name" class="form-label">Model Name</label>
-                                        <input type="text" id="new-model-name" class="form-control" 
-                                               placeholder="e.g., Fantasy Heroes, Sci-Fi Characters...">
+                                        <input type="text" id="new-model-name" class="form-control">
                                     </div>
                                     <div class="col-md-4">
                                         <label for="new-model-category" class="form-label">Category <span class="text-muted">(Optional)</span></label>
-                                        <select id="new-model-category" class="form-select">
-                                            <option value="fantasy">Fantasy</option>
-                                            <option value="sci-fi">Sci-Fi</option>
-                                            <option value="historical">Historical</option>
-                                            <option value="modern">Modern</option>
-                                            <option value="other">Other</option>
-                                        </select>
+                                        <input type="text" id="new-model-category" class="form-control"
+                                               placeholder="e.g., Fantasy, Sci-Fi...">
                                     </div>
                                 </div>
                                 
@@ -150,7 +126,7 @@
                                 
                                 <div class="mb-3">
                                     <label for="custom-names-input" class="form-label">Training Names</label>
-                                    <textarea id="custom-names-input" rows="6" class="form-control" 
+                                    <textarea id="custom-names-input" name="custom-names-input" rows="6" class="form-control" 
                                               placeholder="Enter names here (one per line)...&#10;Aragorn&#10;Legolas&#10;Gimli&#10;Gandalf&#10;..."></textarea>
                                     <div class="custom-notice">
                                         <i class="bi bi-info-circle"></i> 
@@ -160,16 +136,33 @@
                                 
                                 <div class="d-flex gap-2">
                                     <button type="button" class="btn btn-success" id="save-custom-model">
-                                        <i class="bi bi-check-lg"></i> Save Model
+                                        <i class="bi bi-check-lg"></i> Save and Train Model
                                     </button>
                                     <button type="button" class="btn btn-secondary" id="cancel-new-model">
                                         <i class="bi bi-x-lg"></i> Cancel
                                     </button>
                                 </div>
                             </div>
-                            
-                            <!-- Status Messages -->
-                            <div id="status-messages"></div>
+                            <!-- Status Messages (show above selected model) -->
+                            <div id="status-messages" class="mb-3"></div>
+
+                            <!-- Selected Model Info (always visible) -->
+                            <div class="row mb-3 align-items-center" id="selected-model-info">
+                                <div class="col-md-7">
+                                    <label class="form-label">Selected Custom Model</label>
+                                    <div class="form-control text-truncate" id="selected-model-display" readonly style="background: var(--bg-secondary); max-width:100%; overflow:hidden;">
+                                        None selected
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="gender-custom" class="form-label">Gender</label>
+                                    <select id="gender-custom" name="gender_custom" class="form-select">
+                                        <option value="neutral" selected>Neutral</option>
+                                        <option value="female">Female</option>
+                                        <option value="male">Male</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
