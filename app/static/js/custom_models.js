@@ -74,9 +74,29 @@ function setupEventListeners() {
 }
 
 function loadCustomModels() {
-    // In production, this would load from your backend
-    // For now, using mock data with simulated persistence
-    renderModelsList();
+    // Load from backend
+    fetch('/api/custom_models')
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.models) {
+                // normalize model objects
+                customModels = data.models.map(m => ({
+                    id: m.id,
+                    name: m.name || m.id,
+                    description: m.description || '',
+                    category: m.category || 'other',
+                    nameCount: m.nameCount || 0,
+                    createdAt: m.createdAt || Date.now(),
+                    lastUsed: m.lastUsed || Date.now(),
+                    trainingData: m.trainingData || ''
+                }));
+            }
+            renderModelsList();
+        })
+        .catch(err => {
+            console.error('Error loading custom models:', err);
+            renderModelsList();
+        });
 }
 
 function renderModelsList(filteredModels = null) {
@@ -114,13 +134,13 @@ function renderModelsList(filteredModels = null) {
                     </div>
                 </div>
                 <div class="model-actions">
-                    <button class="btn btn-outline-primary btn-icon" data-action="select" data-id="${model.id}" title="Select">
+                    <button type="button" class="btn btn-outline-primary btn-icon" data-action="select" data-id="${model.id}" title="Select">
                         <i class="bi bi-check2"></i>
                     </button>
-                    <button class="btn btn-outline-secondary btn-icon" data-action="edit" data-id="${model.id}" title="Edit">
+                    <button type="button" class="btn btn-outline-secondary btn-icon" data-action="edit" data-id="${model.id}" title="Edit">
                         <i class="bi bi-pencil"></i>
                     </button>
-                    <button class="btn btn-outline-danger btn-icon" data-action="delete" data-id="${model.id}" title="Delete">
+                    <button type="button" class="btn btn-outline-danger btn-icon" data-action="delete" data-id="${model.id}" title="Delete">
                         <i class="bi bi-trash"></i>
                     </button>
                 </div>
@@ -139,6 +159,8 @@ function renderModelsList(filteredModels = null) {
 
     modelsList.querySelectorAll('.model-actions button').forEach(btn => {
         btn.addEventListener('click', function(e) {
+            // Prevent the button from submitting any surrounding form
+            e.preventDefault();
             e.stopPropagation();
             const action = this.dataset.action;
             const id = this.dataset.id;
@@ -172,8 +194,11 @@ function selectModel(modelId) {
         // Update UI
         const display = document.getElementById('selected-model-display');
         if (display) display.textContent = model.name;
+        // Update the text.
         const info = document.getElementById('selected-model-info');
-        if (info) info.style.display = 'block';
+        if (info) {
+            /* no-op: keep layout controlled by CSS only */
+        }
         const hidden = document.getElementById('selected-custom-model');
         if (hidden) hidden.value = modelId;
 
@@ -209,7 +234,96 @@ function clearNewModelForm() {
     const name = document.getElementById('new-model-name'); if (name) name.value = '';
     const desc = document.getElementById('new-model-description'); if (desc) desc.value = '';
     const names = document.getElementById('custom-names-input'); if (names) names.value = '';
-    const cat = document.getElementById('new-model-category'); if (cat) cat.value = 'fantasy';
+    const cat = document.getElementById('new-model-category'); if (cat) cat.value = '';
+}
+
+// Start training by POSTing to /train and streaming SSE updates
+function startTraining(payload) {
+    // Show loading UI (main.js defines these globals)
+    if (typeof loadingDiv !== 'undefined' && loadingDiv) loadingDiv.style.display = 'block';
+    if (typeof loadingText !== 'undefined' && loadingText) loadingText.textContent = 'Preparing training...';
+    if (typeof progressBar !== 'undefined' && progressBar) progressBar.style.width = '0%';
+    if (typeof restoreSpinner === 'function') restoreSpinner();
+
+    fetch('/train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error('Train request failed: ' + response.statusText);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        function processStream() {
+            return reader.read().then(({ done, value }) => {
+                if (done) return;
+                const text = decoder.decode(value);
+                const lines = text.split('\n\n');
+                lines.forEach(line => {
+                    if (!line.startsWith('data:')) return;
+                    try {
+                        const jsonData = JSON.parse(line.substring(5).trim());
+                        if (jsonData.message && typeof loadingText !== 'undefined') {
+                            loadingText.textContent = jsonData.message;
+                        }
+                        if (jsonData.progress !== undefined && typeof progressBar !== 'undefined') {
+                            progressBar.style.width = jsonData.progress + '%';
+                        }
+
+                        switch (jsonData.type) {
+                            case 'preparing':
+                            case 'loading':
+                            case 'training':
+                                if (typeof restoreSpinner === 'function') restoreSpinner();
+                                break;
+                            case 'heartbeat':
+                                // keep alive
+                                break;
+                            case 'error':
+                                if (typeof showWarningImage === 'function') showWarningImage();
+                                showStatusMessage('Training error: ' + (jsonData.message || 'Unknown'), 'error');
+                                break;
+                            case 'complete':
+                                // training finished; backend should include model_id
+                                const modelId = jsonData.model_id;
+                                // Indicate training success and that artifacts were uploaded
+                                showStatusMessage('Training complete — model saved', 'success');
+                                // Refresh list and select model if id available
+                                if (modelId) {
+                                    loadCustomModels();
+                                    selectModel(modelId);
+                                    const hidden = document.getElementById('selected-custom-model');
+                                    if (hidden) hidden.value = modelId;
+                                } else {
+                                    loadCustomModels();
+                                }
+                                // hide new model form
+                                hideNewModelForm();
+                                // hide loading after short pause to let user read
+                                setTimeout(() => {
+                                    if (typeof loadingDiv !== 'undefined' && loadingDiv) loadingDiv.style.display = 'none';
+                                }, 800);
+                                break;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing training SSE:', e);
+                        if (typeof showWarningImage === 'function') showWarningImage();
+                        showStatusMessage('Training stream parsing failed', 'error');
+                    }
+                });
+                return processStream();
+            });
+        }
+
+        return processStream();
+    }).catch(err => {
+        console.error('Training request failed:', err);
+        if (typeof showWarningImage === 'function') showWarningImage();
+        showStatusMessage('Training failed: ' + err.message, 'error');
+    });
 }
 
 function saveCustomModel() {
@@ -236,8 +350,8 @@ function saveCustomModel() {
     }
 
     const nameList = names.split('\n').filter(n => n.trim()).length;
-    if (nameList < 5) {
-        showStatusMessage('Please enter at least 5 names for training', 'error');
+    if (nameList < 3) {
+        showStatusMessage('Please enter at least 3 names for training', 'error');
         return;
     }
 
@@ -256,12 +370,47 @@ function saveCustomModel() {
     // Add to models array
     customModels.push(newModel);
 
-    // In production, send to backend here
-    simulateSaveToBackend(newModel);
+    // Send metadata to backend and immediately start training
+    fetch('/api/custom_models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: newModel.name,
+            description: newModel.description,
+            category: newModel.category,
+            trainingData: newModel.trainingData
+        })
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp && resp.success) {
+            // Do NOT show final "saved" success here — we only show it after .keras is uploaded
+            // backend may return a deterministic model_id
+            if (resp.model_id) newModel.id = resp.model_id;
+            // refresh list so the UI knows about the backend model
+            loadCustomModels();
+            // auto-select the new model in the UI
+            selectModel(newModel.id);
+            // Inform the user that training will start
+            showStatusMessage('Model metadata saved — starting training...', 'info');
+            // Start training immediately and stream progress
+            startTraining({
+                trainingData: newModel.trainingData,
+                name: newModel.name,
+                category: newModel.category,
+                description: newModel.description
+            });
+        } else {
+            showStatusMessage('Failed to save model: ' + (resp.error || 'unknown'), 'error');
+        }
+    })
+    .catch(err => {
+        console.error('Error saving model:', err);
+        showStatusMessage('Failed to save model: ' + err.message, 'error');
+    });
 
     // Update UI
     renderModelsList();
-    showStatusMessage(`Model "${name}" saved successfully!`, 'success');
     hideNewModelForm();
 
     // Auto-select the new model
@@ -275,18 +424,28 @@ function editModel(modelId) {
 
 function deleteModel(modelId) {
     if (!confirm('Are you sure you want to delete this model? This action cannot be undone.')) return;
-    customModels = customModels.filter(m => m.id !== modelId);
 
-    // In production, send delete request to backend
-
-    if (selectedModelId === modelId) {
-        selectedModelId = null;
-        const info = document.getElementById('selected-model-info'); if (info) info.style.display = 'none';
-        const hidden = document.getElementById('selected-custom-model'); if (hidden) hidden.value = '';
-    }
-
-    renderModelsList();
-    showStatusMessage('Model deleted successfully', 'success');
+    fetch('/api/custom_models/' + encodeURIComponent(modelId), { method: 'DELETE' })
+        .then(r => r.json())
+        .then(resp => {
+            if (resp && resp.success) {
+                showStatusMessage('Model deleted successfully', 'success');
+                if (selectedModelId === modelId) {
+                        selectedModelId = null;
+                        // Clear the displayed model name but keep the info box visible so layout stays stable.
+                        const display = document.getElementById('selected-model-display'); if (display) display.textContent = '';
+                        const hidden = document.getElementById('selected-custom-model'); if (hidden) hidden.value = '';
+                        // Do not change inline styles on #selected-model-info.
+                }
+                loadCustomModels();
+            } else {
+                showStatusMessage('Failed to delete model', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('Delete error:', err);
+            showStatusMessage('Failed to delete model: ' + err.message, 'error');
+        });
 }
 
 function generateModelId() {
@@ -294,13 +453,33 @@ function generateModelId() {
 }
 
 function simulateSaveToBackend(model) {
-    // In production, this would be an actual API call
-    console.log('Saving model to backend:', model);
-
-    // Simulate network delay
-    setTimeout(() => {
-        console.log('Model saved to backend successfully');
-    }, 1000);
+    // POST to backend to save metadata and training data (S3)
+    fetch('/api/custom_models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: model.name,
+            description: model.description,
+            category: model.category,
+            trainingData: model.trainingData
+        })
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp && resp.success) {
+            // update ID in local list if backend returned different id
+            if (resp.model_id && resp.model_id !== model.id) {
+                model.id = resp.model_id;
+            }
+            loadCustomModels();
+        } else {
+            showStatusMessage('Failed to save model: ' + (resp.error || 'unknown'), 'error');
+        }
+    })
+    .catch(err => {
+        console.error('Error saving model:', err);
+        showStatusMessage('Failed to save model: ' + err.message, 'error');
+    });
 }
 
 function showStatusMessage(message, type) {
@@ -325,9 +504,9 @@ function showStatusMessage(message, type) {
 
     statusContainer.innerHTML = messageHtml;
 
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        const msgElement = document.getElementById(messageId);
-        if (msgElement) msgElement.remove();
-    }, 5000);
+    // // Auto-remove after 5 seconds
+    // setTimeout(() => {
+    //     const msgElement = document.getElementById(messageId);
+    //     if (msgElement) msgElement.remove();
+    // }, 5000);
 }
