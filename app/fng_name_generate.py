@@ -1,58 +1,77 @@
 import numpy as np
-import tensorflow as tf
-import pickle
+try:
+    import tensorflow as tf
+except Exception:
+    tf = None
+import json
 import os
 from collections import Counter
 from app.fng_model import BigramPenaltyLoss
+from app.storage import load_model_from_s3
+import tempfile
 
 # Global cache for trigram data
 _trigram_endings = {}
 
-def load_model_data(model_name='my_model'):
+def load_model_data(model_name='my_model', user_id=None):
     if model_name.startswith('custom'):
-        model_path = f'app/models/custom/{model_name}.keras'
-        data_path = f'app/models/custom/{model_name}_data.pkl'
+        if user_id is None:
+            raise ValueError("user_id is required for custom models")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            keras_path = os.path.join(tmpdir, f"{model_name}.keras")
+            json_path = os.path.join(tmpdir, f"{model_name}_data.json")
+
+            # use helper to download and load metadata
+            data_dict = load_model_from_s3(user_id, model_name, keras_path, json_path)
+
+            model = tf.keras.models.load_model(
+                keras_path,
+                custom_objects={'BigramPenaltyLoss': BigramPenaltyLoss}
+            )
+
     else:
+        # built-in (non-custom) models still on local disk
         model_path = f'app/models/{model_name}.keras'
-        data_path = f'app/models/{model_name}_data.pkl'
+        data_path = f'app/models/{model_name}_data.json'
 
-    model = tf.keras.models.load_model(
-        model_path,
-        custom_objects={'BigramPenaltyLoss': BigramPenaltyLoss}
-    )
+        model = tf.keras.models.load_model(
+            model_path,
+            custom_objects={'BigramPenaltyLoss': BigramPenaltyLoss}
+        )
 
-    with open(data_path, 'rb') as file:
-        data_dict = pickle.load(file)
-    
-    X = data_dict['X']
-    y = data_dict['y']
-    char_to_idx = data_dict['char_to_idx']
-    idx_to_char = data_dict['idx_to_char']
-    char_set = data_dict['char_set']
+        with open(data_path, 'r', encoding='utf-8') as file:
+            data_dict = json.load(file)
+
+    # Rebuild placeholders
+    X_shape = data_dict.get('X_shape') or [1, 20]
+    X = np.zeros(tuple(X_shape), dtype=np.int32)
+    char_to_idx = data_dict.get('char_to_idx', {})
+    idx_to_char_list = data_dict.get('idx_to_char', [])
+    idx_to_char = {i: ch for i, ch in enumerate(idx_to_char_list)}
+    char_set = data_dict.get('char_set', [])
     bigram_counts = data_dict.get('bigram_counts', {})
-    avg_length = data_dict.get('avg_length', 6)
-    
+    avg_length = int(data_dict.get('avg_length', 6))
+    y = None
+
     return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length
 
 def get_avg_length(model_name):
     """Get average length and whether it's a default or actual average."""
     try:
         if model_name.startswith('custom'):
-            data_path = f'app/models/custom/{model_name}_data.pkl'
+            data_path = f'app/models/custom/{model_name}_data.json'
         else:
-            data_path = f'app/models/{model_name}_data.pkl'
-        
-        with open(data_path, 'rb') as file:
-            data_dict = pickle.load(file)
-        
-        # Check if avg_length exists in the data
+            data_path = f'app/models/{model_name}_data.json'
+        with open(data_path, 'r', encoding='utf-8') as file:
+            data_dict = json.load(file)
+
         if 'avg_length' in data_dict:
-            return data_dict['avg_length'], False  # Actual length
+            return int(data_dict['avg_length']), False
         else:
-            return 6, True  # Default fallback
-            
+            return 6, True
     except FileNotFoundError:
-        return 6, True  # Default fallback
+        return 6, True
 
 def analyze_training_data(model_name, custom_names):
     """Analyze training data to get gender proportions."""
@@ -390,10 +409,10 @@ def clean_generated_name(raw_name):
     cleaned = raw_name.replace('<F>', '').replace('<M>', '').replace('<N>', '').replace('¶','').strip()
     return cleaned if cleaned else None
 
-def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None, length_mode='average'):
+def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None, length_mode='average', user_id=None):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
     try:
-        model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = load_model_data(model_name)
+        model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = load_model_data(model_name, user_id=user_id)
     except FileNotFoundError as e:
         print(f"Error loading model data: {e}")
         return

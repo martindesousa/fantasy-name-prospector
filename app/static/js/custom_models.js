@@ -1,0 +1,512 @@
+// custom_models.js
+
+// MOCK DATA
+let customModels = [
+    {
+        id: 'fantasy_heroes_001',
+        name: 'Fantasy Heroes',
+        description: 'Epic fantasy character names',
+        category: 'fantasy',
+        nameCount: 45,
+        createdAt: new Date('2024-01-15').getTime(),
+        lastUsed: new Date('2024-01-20').getTime()
+    },
+    {
+        id: 'sci_fi_pilots_002',
+        name: 'Sci-Fi Pilots',
+        description: 'Futuristic pilot names',
+        category: 'sci-fi',
+        nameCount: 32,
+        createdAt: new Date('2024-01-10').getTime(),
+        lastUsed: new Date('2024-01-18').getTime()
+    },
+    {
+        id: 'royal_names_003',
+        name: 'Royal Names',
+        description: 'Noble and royal names',
+        category: 'historical',
+        nameCount: 28,
+        createdAt: new Date('2024-01-05').getTime(),
+        lastUsed: new Date('2024-01-16').getTime()
+    }
+];
+
+let selectedModelId = null;
+
+// Initialize the interface
+document.addEventListener('DOMContentLoaded', function() {
+    // If an initializeInterface function exists in another script, it will run there.
+    loadCustomModels();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Search functionality
+    const searchInput = document.getElementById('model-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            filterModels(this.value);
+        });
+    }
+
+    const createBtn = document.getElementById('create-new-model-btn');
+    if (createBtn) createBtn.addEventListener('click', showNewModelForm);
+
+    const saveBtn = document.getElementById('save-custom-model');
+    if (saveBtn) saveBtn.addEventListener('click', saveCustomModel);
+
+    const cancelBtn = document.getElementById('cancel-new-model');
+    if (cancelBtn) cancelBtn.addEventListener('click', hideNewModelForm);
+
+    const form = document.getElementById('name-generator-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const modelType = document.getElementById('model-type').value;
+
+            if (modelType === 'custom' && !selectedModelId) {
+                e.preventDefault();
+                showStatusMessage('Please select a custom model or create a new one', 'error');
+                return;
+            }
+            // For streaming endpoint, allow the form submit to continue; main.js handles streaming.
+        });
+    }
+}
+
+function loadCustomModels() {
+    // Load from backend
+    fetch('/api/custom_models')
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.models) {
+                // normalize model objects
+                customModels = data.models.map(m => ({
+                    id: m.id,
+                    name: m.name || m.id,
+                    description: m.description || '',
+                    category: m.category || 'other',
+                    nameCount: m.nameCount || 0,
+                    createdAt: m.createdAt || Date.now(),
+                    lastUsed: m.lastUsed || Date.now(),
+                    trainingData: m.trainingData || ''
+                }));
+            }
+            renderModelsList();
+        })
+        .catch(err => {
+            console.error('Error loading custom models:', err);
+            renderModelsList();
+        });
+}
+
+function renderModelsList(filteredModels = null) {
+    const modelsList = document.getElementById('custom-models-list');
+    const emptyState = document.getElementById('empty-state');
+    const modelsToShow = filteredModels || customModels;
+
+    if (!modelsList) return;
+
+    if (modelsToShow.length === 0) {
+        modelsList.innerHTML = '';
+        if (emptyState) modelsList.appendChild(emptyState);
+        return;
+    }
+
+    // Sort by last used (most recent first)
+    const sortedModels = [...modelsToShow].sort((a, b) => b.lastUsed - a.lastUsed);
+
+    modelsList.innerHTML = sortedModels.map(model => {
+        const createdDate = new Date(model.createdAt).toLocaleDateString();
+        const lastUsedDate = new Date(model.lastUsed).toLocaleDateString();
+
+        return `
+            <div class="custom-model-item ${selectedModelId === model.id ? 'selected' : ''}" 
+                 data-model-id="${model.id}">
+                <div class="model-info">
+                    <div class="model-name">${model.name}</div>
+                    <div class="model-meta">
+                        ${model.description || 'No description'}
+                    </div>
+                    <div class="model-stats">
+                        <span class="stat-badge">${model.nameCount} names</span>
+                        <span class="stat-badge">${model.category}</span>
+                        <span class="stat-badge">Used ${lastUsedDate}</span>
+                    </div>
+                </div>
+                <div class="model-actions">
+                    <button type="button" class="btn btn-outline-primary btn-icon" data-action="select" data-id="${model.id}" title="Select">
+                        <i class="bi bi-check2"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-icon" data-action="edit" data-id="${model.id}" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-icon" data-action="delete" data-id="${model.id}" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Attach delegated click listeners
+    modelsList.querySelectorAll('.custom-model-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            if (!e.target.closest('.model-actions')) {
+                selectModel(this.dataset.modelId);
+            }
+        });
+    });
+
+    modelsList.querySelectorAll('.model-actions button').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            // Prevent the button from submitting any surrounding form
+            e.preventDefault();
+            e.stopPropagation();
+            const action = this.dataset.action;
+            const id = this.dataset.id;
+            if (action === 'select') selectModel(id);
+            if (action === 'edit') editModel(id);
+            if (action === 'delete') deleteModel(id);
+        });
+    });
+}
+
+function filterModels(searchTerm) {
+    if (!searchTerm) {
+        renderModelsList();
+        return;
+    }
+
+    const filtered = customModels.filter(model => 
+        model.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (model.description && model.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        model.category.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    renderModelsList(filtered);
+}
+
+function selectModel(modelId) {
+    selectedModelId = modelId;
+    const model = customModels.find(m => m.id === modelId);
+
+    if (model) {
+        // Update UI
+        const display = document.getElementById('selected-model-display');
+        if (display) display.textContent = model.name;
+        // Update the text.
+        const info = document.getElementById('selected-model-info');
+        if (info) {
+            /* no-op: keep layout controlled by CSS only */
+        }
+        const hidden = document.getElementById('selected-custom-model');
+        if (hidden) hidden.value = modelId;
+
+        // Update last used
+        model.lastUsed = Date.now();
+
+        // Re-render to update selection
+        renderModelsList();
+
+        // Hide new model form if open
+        hideNewModelForm();
+    }
+}
+
+function showNewModelForm() {
+    const form = document.getElementById('new-model-form');
+    if (!form) return;
+    form.style.display = 'block';
+    form.classList.add('active');
+    const nameInput = document.getElementById('new-model-name');
+    if (nameInput) nameInput.focus();
+}
+
+function hideNewModelForm() {
+    const form = document.getElementById('new-model-form');
+    if (!form) return;
+    form.style.display = 'none';
+    form.classList.remove('active');
+    clearNewModelForm();
+}
+
+function clearNewModelForm() {
+    const name = document.getElementById('new-model-name'); if (name) name.value = '';
+    const desc = document.getElementById('new-model-description'); if (desc) desc.value = '';
+    const names = document.getElementById('custom-names-input'); if (names) names.value = '';
+    const cat = document.getElementById('new-model-category'); if (cat) cat.value = '';
+}
+
+// Start training by POSTing to /train and streaming SSE updates
+function startTraining(payload) {
+    // Show loading UI (main.js defines these globals)
+    if (typeof loadingDiv !== 'undefined' && loadingDiv) loadingDiv.style.display = 'block';
+    if (typeof loadingText !== 'undefined' && loadingText) loadingText.textContent = 'Preparing training...';
+    if (typeof progressBar !== 'undefined' && progressBar) progressBar.style.width = '0%';
+    if (typeof restoreSpinner === 'function') restoreSpinner();
+
+    fetch('/train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error('Train request failed: ' + response.statusText);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        function processStream() {
+            return reader.read().then(({ done, value }) => {
+                if (done) return;
+                const text = decoder.decode(value);
+                const lines = text.split('\n\n');
+                lines.forEach(line => {
+                    if (!line.startsWith('data:')) return;
+                    try {
+                        const jsonData = JSON.parse(line.substring(5).trim());
+                        if (jsonData.message && typeof loadingText !== 'undefined') {
+                            loadingText.textContent = jsonData.message;
+                        }
+                        if (jsonData.progress !== undefined && typeof progressBar !== 'undefined') {
+                            progressBar.style.width = jsonData.progress + '%';
+                        }
+
+                        switch (jsonData.type) {
+                            case 'preparing':
+                            case 'loading':
+                            case 'training':
+                                if (typeof restoreSpinner === 'function') restoreSpinner();
+                                break;
+                            case 'heartbeat':
+                                // keep alive
+                                break;
+                            case 'error':
+                                if (typeof showWarningImage === 'function') showWarningImage();
+                                showStatusMessage('Training error: ' + (jsonData.message || 'Unknown'), 'error');
+                                break;
+                            case 'complete':
+                                // training finished; backend should include model_id
+                                const modelId = jsonData.model_id;
+                                // Indicate training success and that artifacts were uploaded
+                                showStatusMessage('Training complete — model saved', 'success');
+                                // Refresh list and select model if id available
+                                if (modelId) {
+                                    loadCustomModels();
+                                    selectModel(modelId);
+                                    const hidden = document.getElementById('selected-custom-model');
+                                    if (hidden) hidden.value = modelId;
+                                } else {
+                                    loadCustomModels();
+                                }
+                                // hide new model form
+                                hideNewModelForm();
+                                // hide loading after short pause to let user read
+                                setTimeout(() => {
+                                    if (typeof loadingDiv !== 'undefined' && loadingDiv) loadingDiv.style.display = 'none';
+                                }, 800);
+                                break;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing training SSE:', e);
+                        if (typeof showWarningImage === 'function') showWarningImage();
+                        showStatusMessage('Training stream parsing failed', 'error');
+                    }
+                });
+                return processStream();
+            });
+        }
+
+        return processStream();
+    }).catch(err => {
+        console.error('Training request failed:', err);
+        if (typeof showWarningImage === 'function') showWarningImage();
+        showStatusMessage('Training failed: ' + err.message, 'error');
+    });
+}
+
+function saveCustomModel() {
+    const nameEl = document.getElementById('new-model-name');
+    const descEl = document.getElementById('new-model-description');
+    const catEl = document.getElementById('new-model-category');
+    const namesEl = document.getElementById('custom-names-input');
+    if (!nameEl || !namesEl) return;
+
+    const name = nameEl.value.trim();
+    const description = descEl ? descEl.value.trim() : '';
+    const category = catEl ? catEl.value : 'fantasy';
+    const names = namesEl.value.trim();
+
+    // Validation
+    if (!name) {
+        showStatusMessage('Please enter a model name', 'error');
+        return;
+    }
+
+    if (!names) {
+        showStatusMessage('Please enter some training names', 'error');
+        return;
+    }
+
+    const nameList = names.split('\n').filter(n => n.trim()).length;
+    if (nameList < 3) {
+        showStatusMessage('Please enter at least 3 names for training', 'error');
+        return;
+    }
+
+    // Create new model
+    const newModel = {
+        id: generateModelId(),
+        name: name,
+        description: description,
+        category: category,
+        nameCount: nameList,
+        createdAt: Date.now(),
+        lastUsed: Date.now(),
+        trainingData: names // In production, this would be processed by backend
+    };
+
+    // Add to models array
+    customModels.push(newModel);
+
+    // Send metadata to backend and immediately start training
+    fetch('/api/custom_models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: newModel.name,
+            description: newModel.description,
+            category: newModel.category,
+            trainingData: newModel.trainingData
+        })
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp && resp.success) {
+            // Do NOT show final "saved" success here — we only show it after .keras is uploaded
+            // backend may return a deterministic model_id
+            if (resp.model_id) newModel.id = resp.model_id;
+            // refresh list so the UI knows about the backend model
+            loadCustomModels();
+            // auto-select the new model in the UI
+            selectModel(newModel.id);
+            // Inform the user that training will start
+            showStatusMessage('Model metadata saved — starting training...', 'info');
+            // Start training immediately and stream progress
+            startTraining({
+                trainingData: newModel.trainingData,
+                name: newModel.name,
+                category: newModel.category,
+                description: newModel.description
+            });
+        } else {
+            showStatusMessage('Failed to save model: ' + (resp.error || 'unknown'), 'error');
+        }
+    })
+    .catch(err => {
+        console.error('Error saving model:', err);
+        showStatusMessage('Failed to save model: ' + err.message, 'error');
+    });
+
+    // Update UI
+    renderModelsList();
+    hideNewModelForm();
+
+    // Auto-select the new model
+    selectModel(newModel.id);
+}
+
+function editModel(modelId) {
+    // In production, this would open an edit form
+    showStatusMessage('Edit functionality coming soon!', 'info');
+}
+
+function deleteModel(modelId) {
+    if (!confirm('Are you sure you want to delete this model? This action cannot be undone.')) return;
+
+    fetch('/api/custom_models/' + encodeURIComponent(modelId), { method: 'DELETE' })
+        .then(r => r.json())
+        .then(resp => {
+            if (resp && resp.success) {
+                showStatusMessage('Model deleted successfully', 'success');
+                if (selectedModelId === modelId) {
+                        selectedModelId = null;
+                        // Clear the displayed model name but keep the info box visible so layout stays stable.
+                        const display = document.getElementById('selected-model-display'); if (display) display.textContent = '';
+                        const hidden = document.getElementById('selected-custom-model'); if (hidden) hidden.value = '';
+                        // Do not change inline styles on #selected-model-info.
+                }
+                loadCustomModels();
+            } else {
+                showStatusMessage('Failed to delete model', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('Delete error:', err);
+            showStatusMessage('Failed to delete model: ' + err.message, 'error');
+        });
+}
+
+function generateModelId() {
+    return 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+function simulateSaveToBackend(model) {
+    // POST to backend to save metadata and training data (S3)
+    fetch('/api/custom_models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: model.name,
+            description: model.description,
+            category: model.category,
+            trainingData: model.trainingData
+        })
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp && resp.success) {
+            // update ID in local list if backend returned different id
+            if (resp.model_id && resp.model_id !== model.id) {
+                model.id = resp.model_id;
+            }
+            loadCustomModels();
+        } else {
+            showStatusMessage('Failed to save model: ' + (resp.error || 'unknown'), 'error');
+        }
+    })
+    .catch(err => {
+        console.error('Error saving model:', err);
+        showStatusMessage('Failed to save model: ' + err.message, 'error');
+    });
+}
+
+function showStatusMessage(message, type) {
+    const statusContainer = document.getElementById('status-messages');
+    if (!statusContainer) return;
+    const messageId = 'msg_' + Date.now();
+
+    const alertClass = type === 'success' ? 'success-message' : 
+                     type === 'error' ? 'error-message-inline' : 
+                     'custom-notice';
+
+    const icon = type === 'success' ? 'check-circle' : 
+                type === 'error' ? 'exclamation-triangle' : 
+                'info-circle';
+
+    const messageHtml = `
+        <div id="${messageId}" class="${alertClass}">
+            <i class="bi bi-${icon}"></i>
+            ${message}
+        </div>
+    `;
+
+    statusContainer.innerHTML = messageHtml;
+
+    // // Auto-remove after 5 seconds
+    // setTimeout(() => {
+    //     const msgElement = document.getElementById(messageId);
+    //     if (msgElement) msgElement.remove();
+    // }, 5000);
+}

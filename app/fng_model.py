@@ -2,8 +2,10 @@ import os
 import numpy as np
 import tensorflow as tf
 import keras
-import pickle
+import json
 from collections import Counter
+import tempfile
+from app.storage import save_model_to_s3, get_user_id
 
 # HELPER METHODS FOR load_data #############################################################################
 def load_names(input_text=None, input_file=None):
@@ -208,31 +210,64 @@ def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None):
         callbacks=callbacks
     )
 
-def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length, model_name='my_model'):
-    # Determine save path
-    base_dir = os.path.join('app', 'models', 'custom' if model_name.startswith('custom') else '')
-    os.makedirs(base_dir, exist_ok=True)
-    
-    path = os.path.join(base_dir, model_name)
 
-    # Save the model
-    model.save(path + '.keras')
+def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length, model_name='my_model', user_id=None):
+    # Templates: keep saving locally
+    if not model_name.startswith('custom'):
+        base_dir = os.path.join('app', 'models')
+        os.makedirs(base_dir, exist_ok=True)
+        path = os.path.join(base_dir, model_name)
 
-    
+        model.save(path + '.keras')
 
-    # Prepare and save additional data
-    data_dict = {
-        'X': X,
-        'y': y,
-        'char_to_idx': char_to_idx,
-        'idx_to_char': idx_to_char,
-        'char_set': char_set,
-        'bigram_counts': bigram_counts,
-        'avg_length': avg_length
-    }
+        x_shape = list(X.shape) if hasattr(X, 'shape') else None
+        idx_to_char_list = [idx_to_char[i] for i in range(len(idx_to_char))] if isinstance(idx_to_char, dict) else list(idx_to_char)
 
-    with open(path + '_data.pkl', 'wb') as file:
-        pickle.dump(data_dict, file)
+        data_dict = {
+            'X_shape': x_shape,
+            'char_to_idx': char_to_idx,
+            'idx_to_char': idx_to_char_list,
+            'char_set': char_set,
+            'bigram_counts': dict(bigram_counts),
+            'avg_length': int(avg_length)
+        }
+
+        with open(path + '_data.json', 'w', encoding='utf-8') as file:
+            json.dump(data_dict, file, ensure_ascii=False)
+        return
+
+    # Custom: only upload to S3
+    with tempfile.TemporaryDirectory() as tmpdir:
+        keras_path = os.path.join(tmpdir, model_name + '.keras')
+        json_path = os.path.join(tmpdir, model_name + '.json')
+
+        # Save keras model temporarily
+        model.save(keras_path)
+
+        # Prepare JSON metadata
+        x_shape = list(X.shape) if hasattr(X, 'shape') else None
+        idx_to_char_list = [idx_to_char[i] for i in range(len(idx_to_char))] if isinstance(idx_to_char, dict) else list(idx_to_char)
+
+        data_dict = {
+            'X_shape': x_shape,
+            'char_to_idx': char_to_idx,
+            'idx_to_char': idx_to_char_list,
+            'char_set': char_set,
+            'bigram_counts': dict(bigram_counts),
+            'avg_length': int(avg_length)
+        }
+
+        with open(json_path, 'w', encoding='utf-8') as file:
+            json.dump(data_dict, file, ensure_ascii=False)
+
+        # Upload and forget. Use provided user_id if given; otherwise fall back to calling get_user_id().
+        if user_id is None:
+            user_id, resp = get_user_id()
+        try:
+            save_model_to_s3(user_id, model_name, keras_path, json_path)
+        except Exception as e:
+            # surface/save_model_to_s3 errors to caller if needed
+            raise
 
 class TrainingProgressCallback(tf.keras.callbacks.Callback):
     def __init__(self, total_epochs, stream_progress):
