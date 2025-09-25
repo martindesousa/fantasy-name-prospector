@@ -120,14 +120,15 @@
                                 
                                 <div class="mb-3">
                                     <label for="new-model-description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
-                                    <input type="text" id="new-model-description" class="form-control" 
-                                           placeholder="Brief description of your model...">
+                                    <textarea id="new-model-description" name="new-model-description" rows="2" maxlength="150" class="form-control" 
+                                              placeholder="Brief description of your model (max 150 chars)..."></textarea>
+                                    <div class="form-text">Max 150 characters.</div>
                                 </div>
                                 
                                 <div class="mb-3">
                                     <label for="custom-names-input" class="form-label">Training Names</label>
                                     <textarea id="custom-names-input" name="custom-names-input" rows="6" class="form-control" 
-                                              placeholder="Enter names here (one per line)...&#10;Aragorn&#10;Legolas&#10;Gimli&#10;Gandalf&#10;..."></textarea>
+                                              placeholder="Enter names here (one per line)...&#10;Name_1&#10;Name_2&#10;Name_3&#10;Name_4&#10;..."></textarea>
                                     <div class="custom-notice">
                                         <i class="bi bi-info-circle"></i> 
                                         <strong>Tip:</strong> Add at least 20 names for better results. More names = better quality!
@@ -150,7 +151,7 @@
                             <div class="row mb-3 align-items-center" id="selected-model-info">
                                 <div class="col-md-7">
                                     <label class="form-label">Selected Custom Model</label>
-                                    <div class="form-control text-truncate" id="selected-model-display" readonly style="background: var(--bg-secondary); max-width:100%; overflow:hidden;">
+                                    <div class="form-control" id="selected-model-display" readonly style="background: var(--bg-secondary); max-width:100%; white-space:normal; overflow:auto;">
                                         None selected
                                     </div>
                                 </div>
