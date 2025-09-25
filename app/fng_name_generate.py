@@ -13,6 +13,32 @@ import tempfile
 # Global cache for trigram data
 _trigram_endings = {}
 
+
+def _normalize_custom_names(names):
+    """Ensure each provided custom name has a gender tag and an END token.
+
+    - Strips whitespace
+    - Prepends '<N> ' for names that don't start with '<F>', '<M>', or '<N>'
+    - Appends explicit END char '¶' if not already present
+    Returns the normalized list.
+    """
+    if not names:
+        return []
+    normalized = []
+    END_CHAR = '¶'
+    for n in names:
+        if not isinstance(n, str):
+            continue
+        s = n.strip()
+        if not s:
+            continue
+        if not (s.startswith('<F>') or s.startswith('<M>') or s.startswith('<N>')):
+            s = f"<N> {s}"
+        if not s.endswith(END_CHAR):
+            s = s + END_CHAR
+        normalized.append(s)
+    return normalized
+
 def load_model_data(model_name='my_model', user_id=None):
     if model_name.startswith('custom'):
         if user_id is None:
@@ -78,7 +104,7 @@ def analyze_training_data(model_name, custom_names):
     gender_stats = {"<F>": [], "<M>": [], "<N>": []}
     
     if custom_names:
-        names_to_analyze = custom_names
+        names_to_analyze = _normalize_custom_names(custom_names)
     else:
         # Load from textfile for pretrained models
         textfile_path = os.path.join('app', 'textfiles', f"{model_name}_names.txt")
@@ -129,9 +155,9 @@ def analyze_trigram_endings(model_name, custom_names):
         return _trigram_endings[cache_key]
     
     ending_trigrams = set()
-    
+
     if custom_names:
-        names_to_analyze = custom_names
+        names_to_analyze = _normalize_custom_names(custom_names)
     else:
         # Load from textfile for pretrained models
         textfile_path = os.path.join('app', 'textfiles', f"{model_name}_names.txt")
@@ -255,21 +281,33 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
     chosen_gender_token = np.random.choice(gender_probs['tokens'], p=gender_probs['probabilities'])
     
     # Handle prefix vs first letter selection
+    # If the model's vocabulary doesn't include the angle-bracket tokens or a space,
+    # don't inject them into the starting string because the model cannot represent
+    # them and that mismatch can change the initial sampling distribution.
+    vocab_has_tokens = all(tok in char_to_idx for tok in ['<', '>', ' '])
+
     if first_letter_info['use_prefix']:
         # Use the full prefix
         prefix = first_letter_info['prefix']
         formatted_prefix = prefix[0].upper() + prefix[1:].lower() if len(prefix) > 1 else prefix.upper()
-        name = f"{chosen_gender_token} {formatted_prefix}"
+        if vocab_has_tokens:
+            name = f"{chosen_gender_token} {formatted_prefix}"
+        else:
+            # Start with prefix only if tokens are missing
+            name = formatted_prefix
         prefix_length = len(prefix)
     else:
         # Choose single first letter
         first_letter = np.random.choice(first_letter_info['letters'], p=first_letter_info['probabilities'])
-        name = f"{chosen_gender_token} {first_letter.upper()}"
+        if vocab_has_tokens:
+            name = f"{chosen_gender_token} {first_letter.upper()}"
+        else:
+            name = first_letter.upper()
         prefix_length = 1
 
-    # Calculate target length accounting for gender token, space, and prefix
-    gender_token_length = len(chosen_gender_token)  # e.g., "<F>" = 3 chars
-    space_length = 1
+    # Calculate target length accounting for gender token and space (only if present in vocab)
+    gender_token_length = len(chosen_gender_token) if vocab_has_tokens else 0
+    space_length = 1 if vocab_has_tokens else 0
 
     # If auto_mode, we'll use heuristics to decide when to stop; otherwise use explicit target
     if not auto_mode:
@@ -299,6 +337,7 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
                 next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char,
                                                 position_from_end=chars_remaining, target_length=target_length,
                                                 current_name=name, valid_trigrams=valid_trigrams, avg_length=avg_length)
+
 
             # Skip unwanted characters
             if should_skip_character(next_char, name, chosen_gender_token):
@@ -333,6 +372,7 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
 
             name += next_char
     # Clean and return the name
+
     return clean_generated_name(name)
 
 def sample_next_character(predictions, idx_to_char, temperature, prev_char=None, capital_penalty=2.5, 
@@ -389,8 +429,21 @@ def sample_next_character(predictions, idx_to_char, temperature, prev_char=None,
     probs = np.exp(logits)
     probs /= np.sum(probs)
     predicted_index = np.random.choice(len(probs), p=probs)
-    
-    return idx_to_char[predicted_index]
+    # # Extended sampling debug
+    # try:
+    #     if os.environ.get('FNG_DEBUG_GEN') == '2':
+    #         # Show top 6 candidates by probability
+    #         top_idx = np.argsort(probs)[-6:][::-1]
+    #         top = [(int(i), float(probs[i]), idx_to_char[i] if isinstance(idx_to_char, dict) or isinstance(idx_to_char, list) else idx_to_char[i]) for i in top_idx]
+    #         print('[FNG DEBUG EXT] top_choices=', top, flush=True)
+    # except Exception:
+    #     pass
+
+    # # Debug the actual character being returned
+    # if os.environ.get('FNG_DEBUG_GEN') == '1':
+    #     print(f'[FNG DEBUG] predicted_index={predicted_index}, returning_char="{idx_to_char[predicted_index]}"', flush=True)
+
+    # return idx_to_char[predicted_index]
 
 def should_skip_character(char, current_name, gender_token):
     """Determine if a character should be skipped during generation."""
@@ -416,6 +469,8 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
     except FileNotFoundError as e:
         print(f"Error loading model data: {e}")
         return
+    
+
 
     # Prepare configurations
     gender_stats = analyze_training_data(model_name, custom_names)

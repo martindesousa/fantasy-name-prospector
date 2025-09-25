@@ -225,6 +225,17 @@ def stream_progress():
             selected_custom = request.form.get('selected_custom_model', '').strip()
             if selected_custom:
                 model_name = selected_custom
+                # Load the training data from metadata
+                try:
+                    s3 = storage.s3
+                    bucket = storage.BUCKET
+                    key = f"{user_id}/{model_name}.meta.json"
+                    body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
+                    meta = json.loads(body)
+                    raw_custom = meta.get('trainingData', '')
+                    custom_names = raw_custom.splitlines()
+                except Exception:
+                    custom_names = []
             else:
                 raw_custom = request.form.get('custom-names-input', '')
                 custom_names = raw_custom.splitlines()
@@ -259,7 +270,7 @@ def stream_progress():
             prefix_text=prefix,
             length=length,
             temperature=temperature,
-            custom_names=None,
+            custom_names=custom_names,
             length_mode=length_mode,
             user_id=user_id if selected_model == 'custom' else None
         )

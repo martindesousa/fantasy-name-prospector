@@ -32,7 +32,7 @@ def load_names(input_text=None, input_file=None):
             # Automatically add <N> tag for names without gender tags
             names.append(f"<N> {line}")
 
-    # Append explicit END token for custom input so model can learn when to stop
+    # Append explicit END token for input so model can learn when to stop
     # Use a single-character token unlikely to appear in names
     END_CHAR = '¶'
     # If either input_text (raw text) or input_file (lines from a file) was used,
