@@ -112,13 +112,8 @@ def analyze_training_data(model_name, custom_names):
             with open(textfile_path, 'r', encoding='utf-8') as f:
                 names_to_analyze = [line.strip() for line in f if line.strip()]
         except FileNotFoundError:
-            # Return default stats if no file found
-            default_stats = {
-                "<F>": ["Anna", "Emma", "Sophie"] * 1000,
-                "<M>": ["John", "Mike", "David"] * 1000, 
-                "<N>": ["Riley", "Alex", "Jordan"] * 300
-            }
-            return default_stats
+            # Return empty stats if no file found
+            return {"<F>": [], "<M>": [], "<N>": []}
 
     
     # Parse names and categorize by gender
@@ -275,7 +270,7 @@ def calculate_trigram_penalty(current_name, candidate_char, valid_trigrams, trig
     
     return 0.0
 
-def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature, valid_trigrams=None, auto_mode=False, avg_length=6):
+def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature, valid_trigrams=None, auto_mode=False, avg_length=6, length_mode='average'):
     """Generate a single name using the provided configuration."""
     # Choose gender token
     chosen_gender_token = np.random.choice(gender_probs['tokens'], p=gender_probs['probabilities'])
@@ -314,36 +309,58 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
         # Target total length should be gender token + space + desired name length
         target_full_length = gender_token_length + space_length + target_length
 
-        # Generate characters until full target length with smart ending logic
-        while len(name) < target_full_length:
-            encoded = [char_to_idx[c] for c in name if c in char_to_idx]
-            if not encoded:
-                break
+        # For custom length mode, just generate until we hit the target - no end token logic needed
+        if length_mode == 'custom':
+            while len(name) < target_full_length:
+                encoded = [char_to_idx[c] for c in name if c in char_to_idx]
+                if not encoded:
+                    break
+                    
+                encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
+                predictions = model.predict(encoded, verbose=0)[0]
                 
-            encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
-            predictions = model.predict(encoded, verbose=0)[0]
-            
-            chars_remaining = target_full_length - len(name)
-            
-            # Apply different logic based on position
-            if chars_remaining == 1:
-                # Last character - apply trigram validation
-                prev_char = name[-1] if name else None
-                next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char, 
-                                                is_final_char=True, current_name=name, valid_trigrams=valid_trigrams, avg_length=avg_length)
-            else:
-                # Not the last character - apply hyphen penalties and normal sampling
                 prev_char = name[-1] if name else None
                 next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char,
-                                                position_from_end=chars_remaining, target_length=target_length,
-                                                current_name=name, valid_trigrams=valid_trigrams, avg_length=avg_length)
+                                                current_name=name, valid_trigrams=valid_trigrams, 
+                                                avg_length=avg_length, suppress_end_tokens=True)
 
-
-            # Skip unwanted characters
-            if should_skip_character(next_char, name, chosen_gender_token):
-                continue
+                # Skip unwanted characters
+                if should_skip_character(next_char, name, chosen_gender_token):
+                    continue
+                    
+                name += next_char
+        else:
+            # For average length mode, use the original logic with end token awareness
+            while len(name) < target_full_length:
+                encoded = [char_to_idx[c] for c in name if c in char_to_idx]
+                if not encoded:
+                    break
+                    
+                encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
+                predictions = model.predict(encoded, verbose=0)[0]
                 
-            name += next_char
+                chars_remaining = target_full_length - len(name)
+                
+                # Apply different logic based on position
+                if chars_remaining == 1:
+                    # Last character - apply trigram validation
+                    prev_char = name[-1] if name else None
+                    next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char, 
+                                                    is_final_char=True, current_name=name, valid_trigrams=valid_trigrams, 
+                                                    avg_length=avg_length)
+                else:
+                    # Not the last character - apply hyphen penalties and normal sampling
+                    prev_char = name[-1] if name else None
+                    next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char,
+                                                    position_from_end=chars_remaining, target_length=target_length,
+                                                    current_name=name, valid_trigrams=valid_trigrams, 
+                                                    avg_length=avg_length)
+
+                # Skip unwanted characters
+                if should_skip_character(next_char, name, chosen_gender_token):
+                    continue
+                    
+                name += next_char
     else:
         # Auto mode: rely only on model sampling. Stop when the explicit END char is sampled
         # or when a hard upper bound is reached to avoid runaway generation.
@@ -360,7 +377,8 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
             prev_char = name[-1] if name else None
             next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char,
                                               position_from_end=None, target_length=None,
-                                              current_name=name, valid_trigrams=valid_trigrams, avg_length=avg_length)
+                                              current_name=name, valid_trigrams=valid_trigrams, 
+                                              avg_length=avg_length, suppress_end_tokens=False)
 
             if should_skip_character(next_char, name, chosen_gender_token):
                 # Skip invalid/undesirable chars but do not apply heuristics beyond that
@@ -371,13 +389,14 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
                 break
 
             name += next_char
+    
     # Clean and return the name
-
     return clean_generated_name(name)
 
 def sample_next_character(predictions, idx_to_char, temperature, prev_char=None, capital_penalty=2.5, 
                          position_from_end=None, target_length=None, is_final_char=False,
-                         current_name=None, valid_trigrams=None, trigram_penalty=3.0, avg_length=None, end_boost=0.10):
+                         current_name=None, valid_trigrams=None, trigram_penalty=3.0, avg_length=None, 
+                         end_boost=0.10, suppress_end_tokens=False):
     """Sampling with capital letter penalties, position-aware penalties, and trigram validation."""
     
     # Standard character sampling with penalties
@@ -411,37 +430,34 @@ def sample_next_character(predictions, idx_to_char, temperature, prev_char=None,
             if penalty > 0:
                 logits[i] -= penalty
 
+    # Suppress end tokens if we haven't reached target length yet
+    if suppress_end_tokens:
+        END_CHARS = ['¶', '<END>']  # Add any other end tokens your model might use
+        for i in range(len(logits)):
+            char = idx_to_char[i]
+            if char in END_CHARS:
+                logits[i] -= 100.0  # Essentially impossible to select
+
     # Slightly boost the logit for an explicit END token if present and we've reached avg_length
+    # (but only if we're not suppressing end tokens)
     try:
-        END_CHAR = '¶'
-        if avg_length and current_name:
-            # compute core name length excluding gender tokens and spaces
-            core_name = current_name.replace('<F>', '').replace('<M>', '').replace('<N>', '').replace(' ', '')
-            if len(core_name) >= avg_length:
-                # find end char index and boost its logit slightly
-                for i in range(len(logits)):
-                    if idx_to_char[i] == END_CHAR:
-                        logits[i] += end_boost
-                        break
+        if not suppress_end_tokens:
+            END_CHAR = '¶'
+            if avg_length and current_name:
+                # compute core name length excluding gender tokens and spaces
+                core_name = current_name.replace('<F>', '').replace('<M>', '').replace('<N>', '').replace(' ', '')
+                if len(core_name) >= avg_length:
+                    # find end char index and boost its logit slightly
+                    for i in range(len(logits)):
+                        if idx_to_char[i] == END_CHAR:
+                            logits[i] += end_boost
+                            break
     except Exception:
         pass
 
     probs = np.exp(logits)
     probs /= np.sum(probs)
     predicted_index = np.random.choice(len(probs), p=probs)
-    # # Extended sampling debug
-    # try:
-    #     if os.environ.get('FNG_DEBUG_GEN') == '2':
-    #         # Show top 6 candidates by probability
-    #         top_idx = np.argsort(probs)[-6:][::-1]
-    #         top = [(int(i), float(probs[i]), idx_to_char[i] if isinstance(idx_to_char, dict) or isinstance(idx_to_char, list) else idx_to_char[i]) for i in top_idx]
-    #         print('[FNG DEBUG EXT] top_choices=', top, flush=True)
-    # except Exception:
-    #     pass
-
-    # # Debug the actual character being returned
-    # if os.environ.get('FNG_DEBUG_GEN') == '1':
-    #     print(f'[FNG DEBUG] predicted_index={predicted_index}, returning_char="{idx_to_char[predicted_index]}"', flush=True)
 
     return idx_to_char[predicted_index]
 
@@ -495,9 +511,10 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
     while yielded < count and attempts < max_attempts:
         attempts += 1
 
-        # Generate a single name
+        # Generate a single name - pass length_mode to the function
         name = generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info,
-                                   target_length, temperature, valid_trigrams, auto_mode=auto_mode, avg_length=avg_length)
+                                   target_length, temperature, valid_trigrams, auto_mode=auto_mode, 
+                                   avg_length=avg_length, length_mode=length_mode)
 
         if not name:
             continue
