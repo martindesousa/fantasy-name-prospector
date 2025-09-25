@@ -443,7 +443,7 @@ def sample_next_character(predictions, idx_to_char, temperature, prev_char=None,
     # if os.environ.get('FNG_DEBUG_GEN') == '1':
     #     print(f'[FNG DEBUG] predicted_index={predicted_index}, returning_char="{idx_to_char[predicted_index]}"', flush=True)
 
-    # return idx_to_char[predicted_index]
+    return idx_to_char[predicted_index]
 
 def should_skip_character(char, current_name, gender_token):
     """Determine if a character should be skipped during generation."""
@@ -470,8 +470,6 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
         print(f"Error loading model data: {e}")
         return
     
-
-
     # Prepare configurations
     gender_stats = analyze_training_data(model_name, custom_names)
     valid_trigrams = analyze_trigram_endings(model_name, custom_names)
