@@ -17,13 +17,23 @@ def get_user_id():
         return user_id, resp
     return user_id, None
 
-def save_model_to_s3(user_id, model_name, keras_path, json_path):
-    s3.upload_file(keras_path, BUCKET, f"{user_id}/{model_name}.keras")
-    s3.upload_file(json_path, BUCKET, f"{user_id}/{model_name}.json")
+def save_model_to_s3(user_id, model_name, keras_path, json_path, meta_dict=None):
+    base_prefix = f"{user_id}/{model_name}/"
+    s3.upload_file(keras_path, BUCKET, base_prefix + "model.keras")
+    s3.upload_file(json_path, BUCKET, base_prefix + "data.json")
+    if meta_dict is not None:
+        s3.put_object(
+            Bucket=BUCKET,
+            Key=base_prefix + "meta.json",
+            Body=json.dumps(meta_dict).encode("utf-8")
+        )
 
-def load_model_from_s3(user_id, model_name, keras_dest, json_dest):
-    s3.download_file(BUCKET, f"{user_id}/{model_name}.keras", keras_dest)
-    s3.download_file(BUCKET, f"{user_id}/{model_name}.json", json_dest)
-    # Read JSON using UTF-8 to avoid mojibake (e.g. stray 'Â' characters)
-    with open(json_dest, 'r', encoding='utf-8', errors='replace') as f:
+def load_model_from_s3(user_id, model_name, keras_dest, json_dest, meta_dest=None):
+    base_prefix = f"{user_id}/{model_name}/"
+    s3.download_file(BUCKET, base_prefix + "model.keras", keras_dest)
+    s3.download_file(BUCKET, base_prefix + "data.json", json_dest)
+    if meta_dest:
+        s3.download_file(BUCKET, base_prefix + "meta.json", meta_dest)
+
+    with open(json_dest, "r", encoding="utf-8") as f:
         return json.load(f)
