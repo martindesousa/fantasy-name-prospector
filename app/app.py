@@ -270,7 +270,7 @@ def stream_progress():
             prefix_text=prefix,
             length=length,
             temperature=temperature,
-            custom_names=custom_names,
+            custom_names=custom_names if selected_model == 'custom' else None,
             length_mode=length_mode,
             user_id=user_id if selected_model == 'custom' else None
         )
@@ -350,7 +350,27 @@ def train():
             try:
                 fng_model.train_model(X, y, model, epochs=epochs, batch_size=64, stream_progress=local_progress_callback)
                 # Save to S3 via helper — provide user_id captured above
-                fng_model.save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length=avg_length, model_name=model_id, user_id=user_id_for_thread)
+                fng_model.save_model_data(
+                    model, 
+                    X, y, 
+                    char_to_idx, 
+                    idx_to_char, 
+                    char_set, 
+                    bigram_counts, 
+                    avg_length=avg_length, 
+                    model_name=model_id, 
+                    user_id=user_id_for_thread,
+                    meta_dict={
+                        'id': model_id,
+                        'name': model_display_name,
+                        'description': description,
+                        'category': category,
+                        'nameCount': len(names),
+                        'createdAt': int(time.time() * 1000),
+                        'lastUsed': int(time.time() * 1000),
+                        'trainingData': raw_names
+                    }
+                )
                 local_queue.put({'epoch': epochs, 'total': epochs, 'complete': True})
             except Exception as e:
                 local_queue.put({'error': str(e)})
@@ -358,6 +378,10 @@ def train():
         threading.Thread(target=train_thread).start()
 
         training_complete = False
+        # track last seen epoch info so heartbeat messages can include useful context
+        last_epoch = 0
+        last_total = epochs if isinstance(epochs, int) and epochs > 0 else 0
+
         while not training_complete:
             try:
                 update = local_queue.get(timeout=0.5)
@@ -369,31 +393,20 @@ def train():
                     yield f"data: {json.dumps({'type': 'training', 'message': 'Training complete', 'progress': 100})}\n\n"
                     break
                 # normal epoch update
-                current = update['epoch']
-                total = update['total']
-                progress = int((current / total) * 100)
+                current = update.get('epoch', last_epoch)
+                total = update.get('total', last_total)
+                # update last seen
+                last_epoch = current
+                last_total = total
+                progress = int((current / total) * 100) if total else 0
                 yield f"data: {json.dumps({'type': 'training', 'message': f'Epoch {current}/{total}', 'progress': progress})}\n\n"
             except queue.Empty:
-                yield f"data: {json.dumps({'type': 'heartbeat', 'message': 'Training in progress...'})}\n\n"
-
-        # After training, save metadata.json entry to S3
-        user_id, cookie_resp = storage.get_user_id()
-        meta = {
-            'id': model_id,
-            'name': model_display_name,
-            'description': description,
-            'category': category,
-            'nameCount': len(names),
-            'createdAt': int(time.time() * 1000),
-            'lastUsed': int(time.time() * 1000),
-            'trainingData': raw_names
-        }
-        s3 = storage.s3
-        bucket = storage.BUCKET
-        try:
-            s3.put_object(Bucket=bucket, Key=f"{user_id}/{model_id}.meta.json", Body=json.dumps(meta).encode('utf-8'))
-        except Exception as e:
-            print('Warning: failed to save metadata to S3:', e)
+                # Queue was empty; report a heartbeat but include last known epoch/total if available
+                try:
+                    heartbeat_msg = f"Training in progress: Epoch {last_epoch}/{last_total}" if last_total else "Training in progress"
+                except Exception:
+                    heartbeat_msg = "Training in progress"
+                yield f"data: {json.dumps({'type': 'heartbeat', 'message': heartbeat_msg, 'progress': int((last_epoch/last_total)*100) if last_total else 0})}\n\n"
 
         yield f"data: {json.dumps({'type': 'complete', 'message': 'Model trained', 'model_id': model_id, 'progress': 100})}\n\n"
 

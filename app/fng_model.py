@@ -211,7 +211,7 @@ def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None):
     )
 
 
-def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length, model_name='my_model', user_id=None):
+def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length, model_name='my_model', user_id=None, meta_dict=None):
     # Templates: keep saving locally
     if not model_name.startswith('custom'):
         base_dir = os.path.join('app', 'models')
@@ -260,13 +260,14 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_coun
         with open(json_path, 'w', encoding='utf-8') as file:
             json.dump(data_dict, file, ensure_ascii=False)
 
-        # Upload and forget. Use provided user_id if given; otherwise fall back to calling get_user_id().
+        # Upload. Use provided user_id if given; otherwise fall back to calling get_user_id().
         if user_id is None:
             user_id, resp = get_user_id()
         try:
-            save_model_to_s3(user_id, model_name, keras_path, json_path)
+            # pass along optional metadata dictionary so storage can persist it
+            save_model_to_s3(user_id, model_name, keras_path, json_path, meta_dict=meta_dict)
         except Exception as e:
-            # surface/save_model_to_s3 errors to caller if needed
+            # surface/save_model_to_s3 errors to caller
             raise
 
 class TrainingProgressCallback(tf.keras.callbacks.Callback):

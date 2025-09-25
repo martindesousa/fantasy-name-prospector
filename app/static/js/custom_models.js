@@ -84,7 +84,7 @@ function loadCustomModels() {
                     id: m.id,
                     name: m.name || m.id,
                     description: m.description || '',
-                    category: m.category || 'other',
+                    category: m.category || 'uncategorized',
                     nameCount: m.nameCount || 0,
                     createdAt: m.createdAt || Date.now(),
                     lastUsed: m.lastUsed || Date.now(),
@@ -120,32 +120,40 @@ function renderModelsList(filteredModels = null) {
         const lastUsedDate = new Date(model.lastUsed).toLocaleDateString();
 
         return `
-            <div class="custom-model-item ${selectedModelId === model.id ? 'selected' : ''}" 
-                 data-model-id="${model.id}">
-                <div class="model-info">
-                    <div class="model-name">${model.name}</div>
-                    <div class="model-meta">
-                        ${model.description || 'No description'}
-                    </div>
-                    <div class="model-stats">
-                        <span class="stat-badge">${model.nameCount} names</span>
-                        <span class="stat-badge">${model.category}</span>
-                        <span class="stat-badge">Used ${lastUsedDate}</span>
-                    </div>
+            <div class="custom-model-item d-flex justify-content-between align-items-start ${selectedModelId === model.id ? 'selected' : ''}" 
+                data-model-id="${model.id}" 
+                style="padding:15px 20px; border-radius:10px;">
+
+                <!-- Info -->
+                <div class="model-info flex-grow-1" style="min-width:0; padding-right:15px;">
+                <div class="model-name fw-semibold" style="font-size:1.05rem; line-height:1.2; margin-bottom:4px;">
+                    ${model.name}
                 </div>
-                <div class="model-actions">
-                    <button type="button" class="btn btn-outline-primary btn-icon" data-action="select" data-id="${model.id}" title="Select">
-                        <i class="bi bi-check2"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-icon" data-action="edit" data-id="${model.id}" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-danger btn-icon" data-action="delete" data-id="${model.id}" title="Delete">
-                        <i class="bi bi-trash"></i>
-                    </button>
+                <div class="model-meta text-muted small" style="white-space:normal; word-break:break-word; margin-bottom:6px;">
+                    ${model.description || 'No description'}
+                </div>
+                <div class="model-stats mt-1" style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <span class="stat-badge">${model.nameCount} names</span>
+                    <span class="stat-badge">${model.category}</span>
+                    <span class="stat-badge">Used ${lastUsedDate}</span>
+                </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="model-actions d-flex flex-column align-items-center" style="gap:6px;">
+                <button type="button" class="btn btn-outline-secondary btn-sm btn-icon" 
+                        data-action="edit" data-id="${model.id}" title="Edit" 
+                        style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;padding:0;border-radius:6px;">
+                    <i class="bi bi-pencil" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm btn-icon" 
+                        data-action="delete" data-id="${model.id}" title="Delete" 
+                        style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;padding:0;border-radius:6px;">
+                    <i class="bi bi-trash" aria-hidden="true"></i>
+                </button>
                 </div>
             </div>
-        `;
+            `;
     }).join('');
 
     // Attach delegated click listeners
