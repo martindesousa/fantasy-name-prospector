@@ -228,6 +228,23 @@ function showNewModelForm() {
     form.classList.add('active');
     const nameInput = document.getElementById('new-model-name');
     if (nameInput) nameInput.focus();
+
+    // Smooth scroll the form into view and flash its outline once to draw attention
+    try {
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // flash outline: set a temporary box-shadow and remove it after a short timeout
+        const previousTransition = form.style.transition;
+        form.style.transition = 'box-shadow 220ms ease-in-out';
+        form.style.boxShadow = '0 0 0 4px rgba(255,200,0,0.95)';
+        setTimeout(() => {
+            form.style.boxShadow = '0 0 0 0 rgba(0,0,0,0)';
+            // restore transition after a short delay
+            setTimeout(() => { form.style.transition = previousTransition; }, 240);
+        }, 300);
+    } catch (e) {
+        // not critical if scroll/flash fails in some browsers
+        console.warn('Scroll/flash failed', e);
+    }
 }
 
 function hideNewModelForm() {
@@ -243,6 +260,12 @@ function clearNewModelForm() {
     const desc = document.getElementById('new-model-description'); if (desc) desc.value = '';
     const names = document.getElementById('custom-names-input'); if (names) names.value = '';
     const cat = document.getElementById('new-model-category'); if (cat) cat.value = '';
+
+    // remove any error highlighting
+    if (name) name.classList.remove('input-error');
+    if (desc) desc.classList.remove('input-error');
+    if (names) names.classList.remove('input-error');
+    if (cat) cat.classList.remove('input-error');
 }
 
 // Start training by POSTing to /train and streaming SSE updates
@@ -347,19 +370,36 @@ function saveCustomModel() {
     const names = namesEl.value.trim();
 
     // Validation
+    // clear previous error markers
+    [nameEl, descEl, catEl, namesEl].forEach(el => { if (el) el.classList.remove('input-error'); });
+
+    const errors = {};
     if (!name) {
-        showStatusMessage('Please enter a model name', 'error');
-        return;
+        errors.name = 'Please enter a model name';
     }
 
     if (!names) {
-        showStatusMessage('Please enter some training names', 'error');
-        return;
+        errors.trainingData = 'Please enter some training names';
     }
 
     const nameList = names.split('\n').filter(n => n.trim()).length;
     if (nameList < 3) {
-        showStatusMessage('Please enter at least 3 names for training', 'error');
+        errors.tooFew = 'Please enter at least 3 names for training';
+    }
+
+    if (Object.keys(errors).length > 0) {
+        // Highlight the offending fields
+        if (errors.name && nameEl) nameEl.classList.add('input-error');
+        if ((errors.trainingData || errors.tooFew) && namesEl) namesEl.classList.add('input-error');
+        // Focus the first problematic field
+        if (errors.name && nameEl) {
+            nameEl.focus();
+        } else if ((errors.trainingData || errors.tooFew) && namesEl) {
+            namesEl.focus();
+        }
+        // Show an aggregated message
+        const firstMsg = errors.name || errors.trainingData || errors.tooFew;
+        showStatusMessage(firstMsg, 'error');
         return;
     }
 
@@ -409,7 +449,17 @@ function saveCustomModel() {
                 description: newModel.description
             });
         } else {
-            showStatusMessage('Failed to save model: ' + (resp.error || 'unknown'), 'error');
+            // If backend returns field-specific errors, highlight them
+            if (resp && resp.errors && typeof resp.errors === 'object') {
+                if (resp.errors.name && nameEl) nameEl.classList.add('input-error');
+                if ((resp.errors.trainingData || resp.errors.tooFew) && namesEl) namesEl.classList.add('input-error');
+                // Focus first server-reported field error
+                if (resp.errors.name && nameEl) nameEl.focus();
+                else if ((resp.errors.trainingData || resp.errors.tooFew) && namesEl) namesEl.focus();
+                showStatusMessage(resp.error || 'Failed to save model due to validation errors', 'error');
+            } else {
+                showStatusMessage('Failed to save model: ' + (resp.error || 'unknown'), 'error');
+            }
         }
     })
     .catch(err => {
