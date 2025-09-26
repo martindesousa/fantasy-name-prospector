@@ -144,12 +144,12 @@ function renderModelsList(filteredModels = null) {
                 <button type="button" class="btn btn-outline-secondary btn-sm btn-icon" 
                         data-action="edit" data-id="${model.id}" title="Edit" 
                         style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;padding:0;border-radius:6px;">
-                    <i class="bi bi-pencil" aria-hidden="true"></i>
+                    <img src="/static/images/SettingsGear.png" alt="Edit" style="width:22px;height:22px;object-fit:contain;">
                 </button>
                 <button type="button" class="btn btn-outline-danger btn-sm btn-icon" 
                         data-action="delete" data-id="${model.id}" title="Delete" 
                         style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;padding:0;border-radius:6px;">
-                    <i class="bi bi-trash" aria-hidden="true"></i>
+                    <img src="/static/images/TrashCan.png" alt="Delete" style="width:24px;height:24px;object-fit:contain;">
                 </button>
                 </div>
             </div>
@@ -512,9 +512,9 @@ function showStatusMessage(message, type) {
 
     statusContainer.innerHTML = messageHtml;
 
-    // // Auto-remove after 5 seconds
+    // // Auto-remove after 20 seconds
     // setTimeout(() => {
     //     const msgElement = document.getElementById(messageId);
     //     if (msgElement) msgElement.remove();
-    // }, 5000);
+    // }, 20000);
 }
