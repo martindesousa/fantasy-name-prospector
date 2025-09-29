@@ -36,6 +36,7 @@ def _normalize_custom_names(names):
     return normalized
 
 def load_model_data(model_name='my_model', user_id=None):
+    import tensorflow as tf
     if model_name.startswith('custom'):
         if user_id is None:
             raise ValueError("user_id is required for custom models")
