@@ -5,6 +5,7 @@ from collections import Counter
 from app.fng_model import BigramPenaltyLoss
 from app.storage import load_model_from_s3
 import tempfile
+import tensorflow as tf
 
 # Global cache for trigram data
 _trigram_endings = {}
@@ -36,7 +37,6 @@ def _normalize_custom_names(names):
     return normalized
 
 def load_model_data(model_name='my_model', user_id=None):
-    import tensorflow as tf
     if model_name.startswith('custom'):
         if user_id is None:
             raise ValueError("user_id is required for custom models")
@@ -477,7 +477,6 @@ def clean_generated_name(raw_name):
 
 def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None, length_mode='average', user_id=None):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
-    import tensorflow as tf
     try:
         model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = load_model_data(model_name, user_id=user_id)
     except FileNotFoundError as e:
