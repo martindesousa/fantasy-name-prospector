@@ -1,8 +1,4 @@
 import numpy as np
-try:
-    import tensorflow as tf
-except Exception:
-    tf = None
 import json
 import os
 from collections import Counter
@@ -480,6 +476,7 @@ def clean_generated_name(raw_name):
 
 def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None, length_mode='average', user_id=None):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
+    import tensorflow as tf
     try:
         model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = load_model_data(model_name, user_id=user_id)
     except FileNotFoundError as e:
