@@ -5,10 +5,27 @@ from collections import Counter
 from app.fng_model import BigramPenaltyLoss
 from app.storage import load_model_from_s3
 import tempfile
+import tensorflow as tf
+import gc
 
 # Global cache for trigram data
 _trigram_endings = {}
 
+# CRITICAL: Model cache with proper cleanup
+_model_cache = {}
+_model_cache_max_size = 2  # Only keep 2 models in memory
+
+def _evict_oldest_model():
+    """Remove the oldest model from cache to free memory."""
+    if len(_model_cache) >= _model_cache_max_size:
+        oldest_key = next(iter(_model_cache))
+        model_data = _model_cache.pop(oldest_key)
+        # Explicitly delete the model
+        if 'model' in model_data:
+            del model_data['model']
+        del model_data
+        tf.keras.backend.clear_session()
+        gc.collect()
 
 def _normalize_custom_names(names):
     """Ensure each provided custom name has a gender tag and an END token.
@@ -36,6 +53,16 @@ def _normalize_custom_names(names):
     return normalized
 
 def load_model_data(model_name='my_model', user_id=None):
+    """Load model with caching and automatic cleanup."""
+    cache_key = f"{user_id}_{model_name}" if user_id else model_name
+    
+    # Return cached model if available
+    if cache_key in _model_cache:
+        return _model_cache[cache_key]
+    
+    # Evict old models if cache is full
+    _evict_oldest_model()
+    
     if model_name.startswith('custom'):
         if user_id is None:
             raise ValueError("user_id is required for custom models")
@@ -75,8 +102,22 @@ def load_model_data(model_name='my_model', user_id=None):
     bigram_counts = data_dict.get('bigram_counts', {})
     avg_length = int(data_dict.get('avg_length', 6))
     y = None
+    
+    # Cache the result as a tuple
+    result = (model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length)
+    _model_cache[cache_key] = result
 
-    return model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length
+    return result
+
+def clear_model_cache():
+    """Explicitly clear all cached models. Call this after serving a request or periodically."""
+    global _model_cache
+    for model_data in _model_cache.values():
+        if model_data and len(model_data) > 0:
+            del model_data[0]  # Delete the model object
+    _model_cache.clear()
+    tf.keras.backend.clear_session()
+    gc.collect()
 
 def get_avg_length(model_name):
     """Get average length and whether it's a default or actual average."""
@@ -272,9 +313,6 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
     chosen_gender_token = np.random.choice(gender_probs['tokens'], p=gender_probs['probabilities'])
     
     # Handle prefix vs first letter selection
-    # If the model's vocabulary doesn't include the angle-bracket tokens or a space,
-    # don't inject them into the starting string because the model cannot represent
-    # them and that mismatch can change the initial sampling distribution.
     vocab_has_tokens = all(tok in char_to_idx for tok in ['<', '>', ' '])
 
     if first_letter_info['use_prefix']:
@@ -284,7 +322,6 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
         if vocab_has_tokens:
             name = f"{chosen_gender_token} {formatted_prefix}"
         else:
-            # Start with prefix only if tokens are missing
             name = formatted_prefix
         prefix_length = len(prefix)
     else:
@@ -296,16 +333,13 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
             name = first_letter.upper()
         prefix_length = 1
 
-    # Calculate target length accounting for gender token and space (only if present in vocab)
+    # Calculate target length accounting for gender token and space
     gender_token_length = len(chosen_gender_token) if vocab_has_tokens else 0
     space_length = 1 if vocab_has_tokens else 0
 
-    # If auto_mode, we'll use heuristics to decide when to stop; otherwise use explicit target
     if not auto_mode:
-        # Target total length should be gender token + space + desired name length
         target_full_length = gender_token_length + space_length + target_length
 
-        # For custom length mode, just generate until we hit the target - no end token logic needed
         if length_mode == 'custom':
             while len(name) < target_full_length:
                 encoded = [char_to_idx[c] for c in name if c in char_to_idx]
@@ -313,6 +347,7 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
                     break
                     
                 encoded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=X.shape[1], padding='pre')
+
                 predictions = model.predict(encoded, verbose=0)[0]
                 
                 prev_char = name[-1] if name else None
@@ -320,13 +355,11 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
                                                 current_name=name, valid_trigrams=valid_trigrams, 
                                                 avg_length=avg_length, suppress_end_tokens=True)
 
-                # Skip unwanted characters
                 if should_skip_character(next_char, name, chosen_gender_token):
                     continue
                     
                 name += next_char
         else:
-            # For average length mode, use the original logic with end token awareness
             while len(name) < target_full_length:
                 encoded = [char_to_idx[c] for c in name if c in char_to_idx]
                 if not encoded:
@@ -337,29 +370,23 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
                 
                 chars_remaining = target_full_length - len(name)
                 
-                # Apply different logic based on position
                 if chars_remaining == 1:
-                    # Last character - apply trigram validation
                     prev_char = name[-1] if name else None
                     next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char, 
                                                     is_final_char=True, current_name=name, valid_trigrams=valid_trigrams, 
                                                     avg_length=avg_length)
                 else:
-                    # Not the last character - apply hyphen penalties and normal sampling
                     prev_char = name[-1] if name else None
                     next_char = sample_next_character(predictions, idx_to_char, temperature, prev_char,
                                                     position_from_end=chars_remaining, target_length=target_length,
                                                     current_name=name, valid_trigrams=valid_trigrams, 
                                                     avg_length=avg_length)
 
-                # Skip unwanted characters
                 if should_skip_character(next_char, name, chosen_gender_token):
                     continue
                     
                 name += next_char
     else:
-        # Auto mode: rely only on model sampling. Stop when the explicit END char is sampled
-        # or when a hard upper bound is reached to avoid runaway generation.
         max_cap = max(12, int(avg_length * 2) + 4)
 
         while len(name) < (gender_token_length + space_length + max_cap):
@@ -377,16 +404,13 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
                                               avg_length=avg_length, suppress_end_tokens=False)
 
             if should_skip_character(next_char, name, chosen_gender_token):
-                # Skip invalid/undesirable chars but do not apply heuristics beyond that
                 continue
 
-            # If model outputs the explicit END character, stop generation
             if next_char == '¶' or next_char == '<END>':
                 break
 
             name += next_char
     
-    # Clean and return the name
     return clean_generated_name(name)
 
 def sample_next_character(predictions, idx_to_char, temperature, prev_char=None, capital_penalty=2.5, 
@@ -395,13 +419,12 @@ def sample_next_character(predictions, idx_to_char, temperature, prev_char=None,
                          end_boost=0.10, suppress_end_tokens=False):
     """Sampling with capital letter penalties, position-aware penalties, and trigram validation."""
     
-    # Standard character sampling with penalties
     if temperature == 0:
         logits = np.log(predictions + 1e-8)
     else:
         logits = np.log(predictions + 1e-8) / temperature
 
-    # Apply capital letter penalty (avoid capitals mid-name)
+    # Apply capital letter penalty
     for i in range(len(logits)):
         char = idx_to_char[i]
         if char.isupper() and prev_char not in (None, '-', '<', '>', ' '):
@@ -476,7 +499,6 @@ def clean_generated_name(raw_name):
 
 def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None, length_mode='average', user_id=None):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
-    import tensorflow as tf
     try:
         model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = load_model_data(model_name, user_id=user_id)
     except FileNotFoundError as e:
@@ -489,7 +511,7 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
     gender_probs = calculate_gender_probabilities(gender_stats, gender)
     first_letter_info = prepare_first_letter_distribution(gender_stats, prefix_text, temperature)
 
-    # Determine target_length and auto_mode based on length_mode
+    # Determine target_length and auto_mode
     if length_mode == 'custom' and length is not None:
         target_length = int(length)
         auto_mode = False
@@ -528,3 +550,7 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
                 generated_names.add(name)
                 yielded += 1
                 yield name
+    
+    # CRITICAL: Cleanup after generation is complete
+    # Don't clear the cache here since the model might be reused, but do garbage collection
+    gc.collect()
