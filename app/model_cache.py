@@ -2,6 +2,7 @@ import tensorflow as tf
 import gc
 from collections import OrderedDict
 from threading import Lock
+import random
 from datetime import datetime, timedelta
 
 class ModelCache:
@@ -13,6 +14,7 @@ class ModelCache:
         self._cache = {}  # {user_id: OrderedDict of {model_name: model_data}}
         self._cache_timestamps = {}  # {user_id: datetime of last access}
         self._lock = Lock()
+        self._cleanup_counter = 0  # Counter for periodic cleanup
     
     def _cleanup_stale_users(self):
         """Remove caches for users who haven't been active recently."""
@@ -76,9 +78,10 @@ class ModelCache:
     def get(self, user_id, model_name):
         """Retrieve a cached model for a user."""
         with self._lock:
-            # Periodically cleanup stale caches (every ~20 cache lookups)
-            import random
-            if random.randint(1, 20) == 1:
+            # Periodically cleanup stale caches (every 20 cache lookups)
+            self._cleanup_counter += 1
+            if self._cleanup_counter >= 20:
+                self._cleanup_counter = 0
                 self._cleanup_stale_users()
             
             user_cache = self._get_user_cache(user_id)
