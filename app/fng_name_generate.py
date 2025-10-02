@@ -4,28 +4,18 @@ import os
 from collections import Counter
 from app.fng_model import BigramPenaltyLoss
 from app.storage import load_model_from_s3
+from app.model_cache import (
+    get_model_from_cache, 
+    put_model_in_cache,
+    clear_user_model_cache,
+    clear_all_model_caches,
+    get_trigram_cache,
+    put_trigram_cache
+)
 import tempfile
 import tensorflow as tf
 import gc
 
-# Global cache for trigram data
-_trigram_endings = {}
-
-# CRITICAL: Model cache with proper cleanup
-_model_cache = {}
-_model_cache_max_size = 2  # Only keep 2 models in memory
-
-def _evict_oldest_model():
-    """Remove the oldest model from cache to free memory."""
-    if len(_model_cache) >= _model_cache_max_size:
-        oldest_key = next(iter(_model_cache))
-        model_data = _model_cache.pop(oldest_key)
-        # Explicitly delete the model
-        if 'model' in model_data:
-            del model_data['model']
-        del model_data
-        tf.keras.backend.clear_session()
-        gc.collect()
 
 def _normalize_custom_names(names):
     """Ensure each provided custom name has a gender tag and an END token.
@@ -52,17 +42,18 @@ def _normalize_custom_names(names):
         normalized.append(s)
     return normalized
 
+
 def load_model_data(model_name='my_model', user_id=None):
-    """Load model with caching and automatic cleanup."""
-    cache_key = f"{user_id}_{model_name}" if user_id else model_name
+    """Load model with per-user caching and automatic cleanup."""
+    # Use a default user_id if none provided
+    cache_user_id = user_id if user_id is not None else 'default_user'
     
-    # Return cached model if available
-    if cache_key in _model_cache:
-        return _model_cache[cache_key]
+    # Check cache first
+    cached_data = get_model_from_cache(cache_user_id, model_name)
+    if cached_data is not None:
+        return cached_data
     
-    # Evict old models if cache is full
-    _evict_oldest_model()
-    
+    # Load the model
     if model_name.startswith('custom'):
         if user_id is None:
             raise ValueError("user_id is required for custom models")
@@ -105,19 +96,18 @@ def load_model_data(model_name='my_model', user_id=None):
     
     # Cache the result as a tuple
     result = (model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length)
-    _model_cache[cache_key] = result
+    put_model_in_cache(cache_user_id, model_name, result)
 
     return result
 
-def clear_model_cache():
-    """Explicitly clear all cached models. Call this after serving a request or periodically."""
-    global _model_cache
-    for model_data in _model_cache.values():
-        if model_data and len(model_data) > 0:
-            del model_data[0]  # Delete the model object
-    _model_cache.clear()
-    tf.keras.backend.clear_session()
-    gc.collect()
+
+def clear_model_cache(user_id=None):
+    """Clear cached models. If user_id provided, clear only that user's cache."""
+    if user_id is not None:
+        clear_user_model_cache(user_id)
+    else:
+        clear_all_model_caches()
+
 
 def get_avg_length(model_name):
     """Get average length and whether it's a default or actual average."""
@@ -135,6 +125,7 @@ def get_avg_length(model_name):
             return 6, True
     except FileNotFoundError:
         return 6, True
+
 
 def analyze_training_data(model_name, custom_names):
     """Analyze training data to get gender proportions."""
@@ -179,12 +170,15 @@ def analyze_training_data(model_name, custom_names):
 
     return gender_stats
 
+
 def analyze_trigram_endings(model_name, custom_names):
     """Analyze training data to extract valid ending trigrams."""
     cache_key = f"{model_name}_trigrams"
     
-    if cache_key in _trigram_endings:
-        return _trigram_endings[cache_key]
+    # Check cache with thread safety
+    cached_trigrams = get_trigram_cache(cache_key)
+    if cached_trigrams is not None:
+        return cached_trigrams
     
     ending_trigrams = set()
 
@@ -214,8 +208,10 @@ def analyze_trigram_endings(model_name, custom_names):
             ending_trigram = clean_name[-3:].lower()
             ending_trigrams.add(ending_trigram)
     
-    _trigram_endings[cache_key] = ending_trigrams
+    # Store in cache with thread safety
+    put_trigram_cache(cache_key, ending_trigrams)
     return ending_trigrams
+
 
 def calculate_gender_probabilities(gender_stats, gender_preference):
     """Calculate gender token probabilities based on training data and user preference."""
@@ -247,6 +243,7 @@ def calculate_gender_probabilities(gender_stats, gender_preference):
     
     return {'tokens': tokens, 'probabilities': normalized_probs}
 
+
 def prepare_first_letter_distribution(gender_stats, prefix_text, temperature):
     """Prepare first letter distribution with temperature adjustment."""
     if prefix_text:
@@ -275,6 +272,7 @@ def prepare_first_letter_distribution(gender_stats, prefix_text, temperature):
     
     return {'use_prefix': False, 'letters': letters, 'probabilities': probabilities}
 
+
 def calculate_hyphen_penalty(current_pos, target_length, base_penalty=5.0):
     """Calculate hyphen penalty based on position relative to end of name."""
     chars_from_end = target_length - current_pos
@@ -287,6 +285,7 @@ def calculate_hyphen_penalty(current_pos, target_length, base_penalty=5.0):
         return base_penalty * 2.0
     else:
         return base_penalty  # Normal penalty for middle of name
+
 
 def calculate_trigram_penalty(current_name, candidate_char, valid_trigrams, trigram_penalty=20.0):
     """Calculate penalty for characters that would create invalid ending trigrams."""
@@ -306,6 +305,7 @@ def calculate_trigram_penalty(current_name, candidate_char, valid_trigrams, trig
             return trigram_penalty
     
     return 0.0
+
 
 def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first_letter_info, target_length, temperature, valid_trigrams=None, auto_mode=False, avg_length=6, length_mode='average'):
     """Generate a single name using the provided configuration."""
@@ -413,6 +413,7 @@ def generate_single_name(model, X, char_to_idx, idx_to_char, gender_probs, first
     
     return clean_generated_name(name)
 
+
 def sample_next_character(predictions, idx_to_char, temperature, prev_char=None, capital_penalty=2.5, 
                          position_from_end=None, target_length=None, is_final_char=False,
                          current_name=None, valid_trigrams=None, trigram_penalty=3.0, avg_length=None, 
@@ -480,6 +481,7 @@ def sample_next_character(predictions, idx_to_char, temperature, prev_char=None,
 
     return idx_to_char[predicted_index]
 
+
 def should_skip_character(char, current_name, gender_token):
     """Determine if a character should be skipped during generation."""
     # Skip invalid characters
@@ -492,10 +494,12 @@ def should_skip_character(char, current_name, gender_token):
     
     return False
 
+
 def clean_generated_name(raw_name):
     """Clean the generated name by removing gender tokens."""
     cleaned = raw_name.replace('<F>', '').replace('<M>', '').replace('<N>', '').replace('¶','').strip()
     return cleaned if cleaned else None
+
 
 def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix_text='', length=None, temperature=1.0, min_bigram_count=1, custom_names=None, length_mode='average', user_id=None):
     """Generator that yields unique names one-by-one with guaranteed length and optional bigram filtering."""
@@ -550,7 +554,6 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
                 generated_names.add(name)
                 yielded += 1
                 yield name
-    
-    # CRITICAL: Cleanup after generation is complete
-    # Don't clear the cache here since the model might be reused, but do garbage collection
+
+    # Cleanup after generation is complete
     gc.collect()
