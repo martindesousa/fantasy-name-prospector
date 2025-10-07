@@ -173,18 +173,30 @@
                     <!-- Parameters Row -->
                     <div class="row mb-4">
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <label for="temperature" class="form-label">Temperature</label>
+                            <label for="temperature" class="form-label">Temperature
+                                <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
+                                   data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
+                                   title="Controls randomness in generation.<br>&#8226; Higher = more 'creative' but messy names<br>&#8226; Lower = more 'accurate' but less varied names"></i>
+                            </label>
                             <input type="number" id="temperature" name="temperature" class="form-control" 
                                    placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" value="1.0" required>
-                            <div class="form-text">Higher = more creative/messy</div>
+                <div id="temperature-note" class="form-text text-warning" style="display:none;">Note: temperature=0 will give a deterministic output (it will only produce one distinct result).</div>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <label for="prefix" class="form-label">Prefix <span class="text-muted">(Optional)</span></label>
+                            <label for="prefix" class="form-label">Prefix <span class="text-muted">(Optional)</span>
+                                <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
+                                   data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
+                                   title="Determines starting characters in generated names.<br> Must not exceed specified length when using Custom mode."></i>
+                            </label>
                             <input type="text" id="prefix" name="prefix" class="form-control" 
                                    placeholder="A, Aa, Aaa...">
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <label for="length_mode" class="form-label">Length Mode</label>
+                            <label for="length_mode" class="form-label">Length Mode
+                                <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
+                                   data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
+                                   title="Options for how to determine length.<br> &#8226; Auto: model chooses length<br>&#8226; Average: only use dataset average length<br>&#8226; Custom: you specify exact length"></i>
+                            </label>
                             <select id="length_mode" name="length_mode" class="form-select">
                                 <option value="auto" selected>Auto</option>
                                 <option value="average">Average</option>
@@ -192,11 +204,19 @@
                             </select>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <label for="length" class="form-label">Length</label>
+                            <label for="length" class="form-label">Length
+                                <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
+                                   data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
+                                   title="&#8226; Input length here if using Length Mode = 'Custom'. Disabled for Auto and Average modes."></i>
+                            </label>
                             <input type="text" id="length" class="form-control" placeholder="automatic" disabled>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <label for="count" class="form-label">Count</label>
+                            <label for="count" class="form-label">Count
+                                <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
+                                   data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
+                                   title="&#8226; Number of names generated when you press 'Generate Names'."></i>
+                            </label>
                             <select id="count" name="count" class="form-select">
                                 <option value="1">1</option>
                                 <option value="5">5</option>

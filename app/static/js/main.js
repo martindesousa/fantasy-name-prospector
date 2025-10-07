@@ -174,7 +174,6 @@ function updateButtonVisibility() {
             checkIfModelExistsDebounced();
         }
     } else {
-        trainButton.style.display = 'none';
         generateButton.style.display = 'inline-block';
         generateButton.disabled = false;
     }
@@ -501,7 +500,6 @@ toggleButtons.forEach(button => {
                 if (customNotice) customNotice.style.display = 'none';
             }
             // Ensure action buttons reflect template mode: show generate, hide train
-            trainButton.style.display = 'none';
             generateButton.style.display = 'inline-block';
             generateButton.disabled = false;
             // Update model-dependent UI state
@@ -518,4 +516,84 @@ toggleButtons.forEach(button => {
 if (document.getElementById('model').value === 'custom') {
     const customBtn = Array.from(toggleButtons).find(b => b.getAttribute('data-type') === 'custom');
     if (customBtn) customBtn.click();
+}
+
+// Initialize Bootstrap tooltips for any elements that use data-bs-toggle="tooltip"
+(function initTooltips() {
+    try {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function (el) {
+            // eslint-disable-next-line no-undef
+            if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                new bootstrap.Tooltip(el, { html: true });
+            }
+        });
+    } catch (e) {
+        // non-critical
+        console.warn('Tooltip initialization failed:', e);
+    }
+})();
+
+// Show a small note when temperature is set to 0 (deterministic behavior)
+try {
+    const tempInput = document.getElementById('temperature');
+    const tempNote = document.getElementById('temperature-note');
+    if (tempInput && tempNote) {
+        const countSelect = document.getElementById('count');
+        // store previous count so we can restore when leaving deterministic mode
+        let previousCount = countSelect ? countSelect.value : null;
+
+        // Helper to ensure a hidden input named 'count' exists with the given value
+        function ensureHiddenCount(value) {
+            let hidden = document.getElementById('count-hidden');
+            if (!hidden) {
+                hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.id = 'count-hidden';
+                hidden.name = 'count';
+                form.appendChild(hidden);
+            }
+            hidden.value = String(value);
+        }
+
+        // Helper to remove the hidden count input
+        function removeHiddenCount() {
+            const hidden = document.getElementById('count-hidden');
+            if (hidden) hidden.remove();
+        }
+
+        function updateTempNote() {
+            const v = parseFloat(tempInput.value);
+            if (!isNaN(v) && v === 0) {
+                tempNote.style.display = 'block';
+                // Ensure a hidden count is present so disabled selects still submit a value
+                ensureHiddenCount('1');
+                if (countSelect) {
+                    // save previous if not already saved
+                    if (!countSelect.dataset._saved) {
+                        countSelect.dataset._saved = countSelect.value;
+                    }
+                    countSelect.value = '1';
+                    countSelect.disabled = true;
+                }
+            } else {
+                tempNote.style.display = 'none';
+                // Remove the helper hidden input when not in deterministic mode
+                removeHiddenCount();
+                if (countSelect) {
+                    // restore previous value if present
+                    if (countSelect.dataset._saved) {
+                        countSelect.value = countSelect.dataset._saved;
+                        delete countSelect.dataset._saved;
+                    }
+                    countSelect.disabled = false;
+                }
+            }
+        }
+        tempInput.addEventListener('input', updateTempNote);
+        // run once on load
+        updateTempNote();
+    }
+} catch (e) {
+    console.warn('Temp note init failed', e);
 }

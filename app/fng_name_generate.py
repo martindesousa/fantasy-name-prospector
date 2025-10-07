@@ -262,6 +262,12 @@ def prepare_first_letter_distribution(gender_stats, prefix_text, temperature):
         probabilities = np.ones(len(letters)) / len(letters)
         return {'use_prefix': False, 'letters': letters, 'probabilities': probabilities}
     
+    # Handle temperature == 0 (Always pick the most frequent letter)
+    if temperature == 0:
+        # Pick the letter with the highest count
+        best_letter = max(first_letter_counts, key=first_letter_counts.get)
+        return {'use_prefix': False, 'letters': [best_letter], 'probabilities': [1.0]}
+    
     # Apply temperature to letter probabilities
     letters = list(first_letter_counts.keys())
     counts = np.array([first_letter_counts[char] for char in letters], dtype=np.float32)
@@ -419,11 +425,12 @@ def sample_next_character(predictions, idx_to_char, temperature, prev_char=None,
                          current_name=None, valid_trigrams=None, trigram_penalty=3.0, avg_length=None, 
                          end_boost=0.10, suppress_end_tokens=False):
     """Sampling with capital letter penalties, position-aware penalties, and trigram validation."""
-    
+
     if temperature == 0:
-        logits = np.log(predictions + 1e-8)
-    else:
-        logits = np.log(predictions + 1e-8) / temperature
+        predicted_index = np.argmax(predictions)
+        return idx_to_char[predicted_index]
+    
+    logits = np.log(predictions + 1e-8) / temperature
 
     # Apply capital letter penalty
     for i in range(len(logits)):
@@ -508,12 +515,16 @@ def generate_quality_names_stream(model_name, count=10, gender='neutral', prefix
     except FileNotFoundError as e:
         print(f"Error loading model data: {e}")
         return
-    
+
     # Prepare configurations
     gender_stats = analyze_training_data(model_name, custom_names)
     valid_trigrams = analyze_trigram_endings(model_name, custom_names)
     gender_probs = calculate_gender_probabilities(gender_stats, gender)
     first_letter_info = prepare_first_letter_distribution(gender_stats, prefix_text, temperature)
+
+    # If deterministic mode requested, force a single result to avoid wasted cycles
+    if temperature == 0:
+        count = 1
 
     # Determine target_length and auto_mode
     if length_mode == 'custom' and length is not None:
