@@ -184,6 +184,9 @@ form.addEventListener('submit', function(event) {
 
     const existingResults = document.querySelector('.results-section');
     if (existingResults) existingResults.remove();
+    // Remove any leftover spacer from previous runs
+    const prevSpacer = document.getElementById('results-spacer');
+    if (prevSpacer) prevSpacer.remove();
 
     const formData = new FormData(form);
 
@@ -245,6 +248,32 @@ form.addEventListener('submit', function(event) {
                                             </div>
                                         `;
                                         document.querySelector('.container-fluid').appendChild(resultsContainer);
+                                        // Insert a temporary spacer at the end of the document so scrollIntoView lands the
+                                        // results container more centrally even if it expands after being shown.
+                                        try {
+                                            let spacer = document.getElementById('results-spacer');
+                                            if (!spacer) {
+                                                spacer = document.createElement('div');
+                                                spacer.id = 'results-spacer';
+                                                // tune height as needed (320px is a reasonable default)
+                                                spacer.style.height = '320px';
+                                                spacer.style.pointerEvents = 'none';
+                                                document.body.appendChild(spacer);
+                                            }
+
+                                            // Here, scroll the results into view
+                                            resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                                            const previousTransition = resultsContainer.style.transition;
+                                            resultsContainer.style.transition = 'box-shadow 220ms ease-in-out';
+                                            resultsContainer.style.boxShadow = '0 0 0 4px rgba(23, 109, 201, 1)';
+                                            setTimeout(() => {
+                                                resultsContainer.style.boxShadow = '0 0 0 0 rgba(0,0,0,0)';
+                                                setTimeout(() => { resultsContainer.style.transition = previousTransition; }, 240);
+                                            }, 360);
+                                        } catch (e) {
+                                            console.warn('Scroll/flash for results failed', e);
+                                        }
                                     }
 
                                     if (jsonData.name) {
@@ -286,6 +315,10 @@ form.addEventListener('submit', function(event) {
 
                                 case 'complete':
                                     loadingDiv.style.display = 'none';
+
+                                    // Remove any temporary spacer we added earlier
+                                    const spacerFinal = document.getElementById('results-spacer');
+                                    if (spacerFinal) spacerFinal.remove();
 
                                     let finalResultsContainer = document.querySelector('.results-section');
                                     if (!finalResultsContainer) {
