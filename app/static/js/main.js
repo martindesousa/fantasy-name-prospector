@@ -156,49 +156,6 @@ if (lengthModeSelect) {
     lengthModeSelect.dispatchEvent(new Event('change'));
 }
 
-// Function to update button visibility based on model and training status
-function updateButtonVisibility() {
-    if (modelSelect.value === 'custom') {
-        const currentCustomText = customNamesText.value.trim();
-
-        if (!currentCustomText) {
-            trainButton.style.display = 'inline-block';
-            trainButton.disabled = true;
-            generateButton.style.display = 'none';
-        } else if (currentCustomText === lastTrainedCustomText && lastTrainedCustomText !== '') {
-            trainButton.style.display = 'none';
-            generateButton.style.display = 'inline-block';
-            generateButton.disabled = false;
-        } else {
-            trainButton.disabled = false;
-            checkIfModelExistsDebounced();
-        }
-    } else {
-        generateButton.style.display = 'inline-block';
-        generateButton.disabled = false;
-    }
-}
-
-// Function to toggle the visibility of the custom names input field
-modelSelect.addEventListener('change', function() {
-    if (modelSelect.value === 'custom') {
-        if (customNamesContainer) customNamesContainer.style.display = 'block';
-        if (customNotice) customNotice.style.display = 'block';
-    } else {
-        if (customNamesContainer) customNamesContainer.style.display = 'none';
-        if (customNotice) customNotice.style.display = 'none';
-    }
-    updateButtonVisibility();
-});
-
-// Listen for changes in custom names text
-if (customNamesText) customNamesText.addEventListener('input', function() {
-    updateButtonVisibility();
-});
-
-// Trigger the change event to ensure the correct initial state
-modelSelect.dispatchEvent(new Event('change'));
-
 // Form submit handler with streaming progress
 form.addEventListener('submit', function(event) {
     event.preventDefault();
@@ -345,11 +302,6 @@ form.addEventListener('submit', function(event) {
                                         `;
                                         document.querySelector('.container-fluid').appendChild(finalResultsContainer);
                                     }
-
-                                    if (modelSelect.value === 'custom' && trainButton.style.display !== 'none') {
-                                        lastTrainedCustomText = customNamesText.value.trim();
-                                        updateButtonVisibility();
-                                    }
                                     break;
 
                                 case 'error':
@@ -379,56 +331,6 @@ form.addEventListener('submit', function(event) {
         showWarningImage();
     });
 });
-
-// Function for finding MD5 hash
-function hashCustomNames(text) {
-    const hashHex = md5(text);
-    return `custom_${hashHex}`;
-}
-
-let debounceTimeout = null;
-
-function checkIfModelExistsDebounced() {
-    console.log("Running check for model existence");
-    if (debounceTimeout) {
-        clearTimeout(debounceTimeout);
-    }
-
-    debounceTimeout = setTimeout(() => {
-        const model = modelSelect.value;
-        const customNamesTextValue = customNamesText ? customNamesText.value.trim() : '';
-
-        if (model !== 'custom' || !customNamesTextValue) {
-            return;
-        }
-
-        const hashedModelName = hashCustomNames(customNamesTextValue);
-        console.log("Expected model filename:", hashedModelName);
-
-        fetch('/check_model_exists?model=' + encodeURIComponent(hashedModelName))
-            .then(response => response.json())
-            .then(data => {
-                const modelExists = data.exists;
-
-                if (modelExists) {
-                    lastTrainedCustomText = customNamesTextValue;
-                    trainButton.style.display = 'none';
-                    generateButton.style.display = 'inline-block';
-                } else {
-                    trainButton.style.display = 'inline-block';
-                    generateButton.style.display = 'none';
-                }
-            })
-            .catch(err => {
-                console.error("Error checking model:", err);
-                trainButton.style.display = 'inline-block';
-                generateButton.style.display = 'none';
-            });
-    }, 500);
-}
-
-// Run initial check
-checkIfModelExistsDebounced();
 
 // --- Toggle UI behavior (merged from new code) ---
 const toggleButtons = document.querySelectorAll('.toggle-option');
@@ -485,8 +387,7 @@ toggleButtons.forEach(button => {
 
             if (customNamesContainer) customNamesContainer.style.display = 'block';
             if (customNotice) customNotice.style.display = 'block';
-            // Run the debounced check immediately when switching to custom mode
-            checkIfModelExistsDebounced();
+
         } else {
             // restore template model
             const hidden = document.getElementById('model-hidden');
@@ -499,15 +400,10 @@ toggleButtons.forEach(button => {
                 if (customNamesContainer) customNamesContainer.style.display = 'none';
                 if (customNotice) customNotice.style.display = 'none';
             }
-            // Ensure action buttons reflect template mode: show generate, hide train
             generateButton.style.display = 'inline-block';
             generateButton.disabled = false;
             // Update model-dependent UI state
-            if (modelSelectEl.value === 'custom') {
-                checkIfModelExistsDebounced();
-            } else {
-                updateLengthPlaceholder();
-            }
+            updateLengthPlaceholder();
         }
     });
 });
