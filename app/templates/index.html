@@ -130,8 +130,16 @@
                                 
                                 <div class="mb-3">
                                     <label for="custom-names-input" class="form-label">Training Names</label>
+                                    <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
+                                        data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
+                                        data-bs-title="Write names here to train your custom model.<br>
+                                                If you want your model to have gender, enter names with a gender tag appended to the front:<br>
+                                                &#8226; Female: &amp;lt;F&amp;gt; Jane<br>
+                                                &#8226; Male: &amp;lt;M&amp;gt; John<br>
+                                                &#8226; Neutral: No tag needed.
+                                                "></i>
                                     <textarea id="custom-names-input" name="custom-names-input" rows="6" class="form-control" 
-                                              placeholder="Enter names here (one per line)...&#10;Name_1&#10;Name_2&#10;Name_3&#10;Name_4&#10;..."></textarea>
+                                              placeholder="Enter names here (one per line)...&#10;Name_1&#10;Name_2&#10;Name_3&#10;...&#10;"></textarea>
                                     <div class="custom-notice">
                                         <i class="bi bi-info-circle"></i> 
                                         <strong>Tip:</strong> Add at least 20 names for better results. More names = better quality!
@@ -187,13 +195,13 @@
                             </label>
                             <input type="number" id="temperature" name="temperature" class="form-control" 
                                    placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" value="1.0" required>
-                <div id="temperature-note" class="form-text text-warning" style="display:none;">Note: temperature=0 will give a deterministic output (it will only produce one distinct result).</div>
+                        <div id="temperature-note" class="form-text text-warning" style="display:none;">Note: temperature=0 will give a deterministic output (it will only produce one distinct result).</div>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
                             <label for="prefix" class="form-label">Prefix <span class="text-muted">(Optional)</span>
                                 <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
                                    data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
-                                   title="Determines starting characters in generated names.<br> Must not exceed specified length when using Custom mode."></i>
+                                   title="Determines starting characters in generated names.<br> It must not exceed any specified length."></i>
                             </label>
                             <input type="text" id="prefix" name="prefix" class="form-control" 
                                    placeholder="A, Aa, Aaa...">

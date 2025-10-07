@@ -441,11 +441,11 @@ toggleButtons.forEach(button => {
     });
 });
 
-// Ensure custom tab shows textarea if model is custom on load
-if (document.getElementById('model').value === 'custom') {
-    const customBtn = Array.from(toggleButtons).find(b => b.getAttribute('data-type') === 'custom');
-    if (customBtn) customBtn.click();
-}
+// // Ensure custom tab shows textarea if model is custom on load
+// if (document.getElementById('model').value === 'custom') {
+//     const customBtn = Array.from(toggleButtons).find(b => b.getAttribute('data-type') === 'custom');
+//     if (customBtn) customBtn.click();
+// }
 
 // Initialize Bootstrap tooltips for any elements that use data-bs-toggle="tooltip"
 (function initTooltips() {
@@ -454,7 +454,7 @@ if (document.getElementById('model').value === 'custom') {
         tooltipTriggerList.forEach(function (el) {
             // eslint-disable-next-line no-undef
             if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
-                new bootstrap.Tooltip(el, { html: true });
+                new bootstrap.Tooltip(el, { html: true, sanitize: false });
             }
         });
     } catch (e) {
