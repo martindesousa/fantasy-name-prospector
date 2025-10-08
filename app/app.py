@@ -9,6 +9,7 @@ import threading
 import queue
 import os
 import hashlib
+import logging
 from app import storage
 
 MODEL_DIR = 'app/models'
@@ -45,16 +46,37 @@ def home():
 def get_model_avg_length():
     """API endpoint to get average length for a specific model"""
     model_name = request.args.get('model', 'my_model')
-    
-    if model_name == 'custom':
-        # For custom models, return default since we don't know until training
-        return jsonify({'avg_length': 6, 'is_default': True})
-    else:
+    logger = logging.getLogger(__name__)
+    logger.info("get_model_avg_length called for model=%s", model_name)
+    print(f"[app] get_model_avg_length called for model={model_name}")
+
+    # Custom id (e.g. custom_<hash>), therefore we need
+    # to pass the user's id for the S3 lookup
+    if model_name.startswith('custom'):
         try:
-            avg_length, is_default = fng_name_generate.get_avg_length(model_name)
-            return jsonify({'avg_length': avg_length, 'is_default': is_default})
-        except:
+            try:
+                user_id, cookie_resp = storage.get_user_id()
+            except Exception:
+                user_id = request.cookies.get('user_id') or None
+                cookie_resp = None
+
+            logger.info('Looking up avg_length for custom model %s (user=%s)', model_name, user_id)
+            print(f"[app] resolved user_id={user_id} for model={model_name}")
+            avg_length, is_default = fng_name_generate.get_avg_length(model_name, user_id=user_id)
+            print(f"[app] get_avg_length returned avg_length={avg_length} is_default={is_default} for model={model_name} user={user_id}")
+            resp = jsonify({'avg_length': avg_length, 'is_default': is_default})
+            if cookie_resp:
+                resp.set_cookie('user_id', user_id, max_age=60*60*24*30)
+            return resp
+        except Exception:
             return jsonify({'avg_length': 6, 'is_default': True})
+
+    # Non-custom models (templates) - normal path
+    try:
+        avg_length, is_default = fng_name_generate.get_avg_length(model_name)
+        return jsonify({'avg_length': avg_length, 'is_default': is_default})
+    except Exception:
+        return jsonify({'avg_length': 6, 'is_default': True})
 
 @app.route('/check_model_exists')
 def check_model_exists():
