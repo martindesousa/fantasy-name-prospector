@@ -180,15 +180,97 @@ def api_delete_custom_model(model_id):
     if s3 is None:
         return jsonify({'error': 'S3 not configured'}), 500
 
-    # delete related keys if present
-    keys_to_delete = [f"{user_id}/{model_id}.meta.json", f"{user_id}/{model_id}.json", f"{user_id}/{model_id}.keras"]
-    for key in keys_to_delete:
+    # delete related top-level keys if present (legacy pattern)
+    top_level_keys = [f"{user_id}/{model_id}.meta.json", f"{user_id}/{model_id}.json", f"{user_id}/{model_id}.keras"]
+    for key in top_level_keys:
         try:
             s3.delete_object(Bucket=bucket, Key=key)
+        except Exception as e:
+            try:
+                print(f"Error deleting top-level S3 key {key}: {e}")
+            except Exception:
+                pass
+
+    # Also delete any objects under the model prefix (newer save path user_id/model_id/...)
+    prefix = f"{user_id}/{model_id}/"
+    try:
+        resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+        contents = resp.get('Contents', []) if resp else []
+        if contents:
+            # Build delete list
+            delete_objs = [{'Key': obj['Key']} for obj in contents]
+            try:
+                s3.delete_objects(Bucket=bucket, Delete={'Objects': delete_objs})
+            except Exception as e:
+                try:
+                    print(f"Error deleting objects under prefix {prefix}: {e}")
+                except Exception:
+                    pass
+    except Exception as e:
+        try:
+            print(f"Error listing objects for prefix {prefix}: {e}")
         except Exception:
             pass
 
     return jsonify({'success': True})
+
+
+@app.route('/api/custom_models/<model_id>', methods=['PUT'])
+def api_update_custom_model(model_id):
+    """Update metadata for an existing custom model (no retrain).
+    Expects JSON with optional fields: name, description, category, trainingData
+    """
+    payload = request.get_json() or {}
+    name = payload.get('name')
+    description = payload.get('description')
+    category = payload.get('category')
+    training_data = payload.get('trainingData')
+
+    try:
+        user_id, cookie_resp = storage.get_user_id()
+    except Exception:
+        user_id = request.cookies.get('user_id') or None
+        cookie_resp = None
+
+    s3 = storage.s3
+    bucket = storage.BUCKET
+    if s3 is None:
+        return jsonify({'error': 'S3 not configured'}), 500
+
+    key = f"{user_id}/{model_id}.meta.json"
+    try:
+        # Fetch existing metadata if present
+        try:
+            body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
+            meta = json.loads(body)
+        except Exception:
+            meta = {}
+
+        # Update fields (only when provided)
+        if name is not None:
+            meta['name'] = name
+        if description is not None:
+            meta['description'] = description
+        if category is not None:
+            meta['category'] = category
+        if training_data is not None:
+            meta['trainingData'] = training_data
+            meta['nameCount'] = len([l for l in training_data.splitlines() if l.strip()])
+
+        # Update lastUsed timestamp
+        meta['lastUsed'] = int(time.time() * 1000)
+        if 'createdAt' not in meta:
+            meta['createdAt'] = int(time.time() * 1000)
+
+        s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(meta).encode('utf-8'))
+    except Exception as e:
+        print('Error updating metadata to S3:', e)
+        return jsonify({'error': 'Update failed'}), 500
+
+    response = jsonify({'success': True, 'meta': meta})
+    if cookie_resp:
+        response.set_cookie('user_id', user_id, max_age=60*60*24*30)
+    return response
 
 @app.route('/stream_progress', methods=['POST'])
 def stream_progress():
