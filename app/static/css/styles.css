@@ -118,7 +118,7 @@ body {
 }
 
 .btn-success {
-    background: linear-gradient(135deg, var(--success-color) 0%, #38ac4d 100%);
+    background: linear-gradient(135deg, var(--success-color) 0%, #119429 100%);
     border: none;
     border-radius: 8px; /* Keep rounded */
     font-weight: 500;
@@ -127,7 +127,7 @@ body {
 }
 
 .btn-success:hover {
-    background: linear-gradient(135deg, var(--success-hover) 0%, #319443 100%);
+    background: linear-gradient(135deg, var(--success-hover) 0%, #44e261 100%);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(63, 185, 80, 0.3);
 }
