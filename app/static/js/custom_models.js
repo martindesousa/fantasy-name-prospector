@@ -32,6 +32,8 @@ let customModels = [
 ];
 
 let selectedModelId = null;
+let editingModelId = null; // when editing an existing model, this holds its id
+let originalTrainingData = null;
 
 // Initialize the interface
 document.addEventListener('DOMContentLoaded', function() {
@@ -404,6 +406,92 @@ function saveCustomModel() {
     }
 
     // Create new model
+    // If we're editing an existing model, handle update vs. retrain
+    if (editingModelId) {
+        const existingId = editingModelId;
+        // If training data is unchanged, only update metadata via PUT
+        if (originalTrainingData !== null && originalTrainingData === names) {
+            fetch('/api/custom_models/' + encodeURIComponent(existingId), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, description: description, category: category })
+            })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp && resp.success) {
+                    showStatusMessage('Model metadata updated', 'success');
+                    loadCustomModels();
+                    selectModel(existingId);
+                } else {
+                    showStatusMessage('Failed to update model metadata', 'error');
+                }
+            }).catch(err => {
+                console.error('Update error:', err);
+                showStatusMessage('Failed to update model: ' + err.message, 'error');
+            }).finally(() => {
+                editingModelId = null;
+                originalTrainingData = null;
+                hideNewModelForm();
+            });
+        } else {
+            // training data changed: create/train as new model (existing behavior)
+            // reset editing flags and proceed with create+train
+            editingModelId = null;
+            originalTrainingData = null;
+            // reuse existing creation flow by posting to /api/custom_models
+            const newModel = {
+                id: generateModelId(),
+                name: name,
+                description: description,
+                category: category,
+                nameCount: nameList,
+                createdAt: Date.now(),
+                lastUsed: Date.now(),
+                trainingData: names
+            };
+
+            fetch('/api/custom_models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newModel.name, description: newModel.description, category: newModel.category, trainingData: newModel.trainingData })
+            }).then(r => r.json()).then(resp => {
+                if (resp && resp.success) {
+                    if (resp.model_id) newModel.id = resp.model_id;
+                    loadCustomModels();
+                    selectModel(newModel.id);
+                    showStatusMessage('Model metadata saved — starting training...', 'info');
+                    startTraining({ trainingData: newModel.trainingData, name: newModel.name, category: newModel.category, description: newModel.description });
+                    // If we were editing an existing model, delete the old model artifacts to avoid duplicates
+                    if (existingId && resp.model_id && resp.model_id !== existingId) {
+                        fetch('/api/custom_models/' + encodeURIComponent(existingId), { method: 'DELETE' })
+                            .then(r => r.json())
+                            .then(delResp => {
+                                if (delResp && delResp.success) {
+                                    // remove from local list and refresh
+                                    customModels = customModels.filter(m => m.id !== existingId);
+                                    renderModelsList();
+                                    showStatusMessage('Previous model removed', 'info');
+                                } else {
+                                    console.warn('Failed to delete previous model:', delResp);
+                                }
+                            }).catch(err => {
+                                console.error('Error deleting previous model:', err);
+                            });
+                    }
+                } else {
+                    showStatusMessage('Failed to save model: ' + (resp.error || 'unknown'), 'error');
+                }
+            }).catch(err => {
+                console.error('Error saving model:', err);
+                showStatusMessage('Failed to save model: ' + err.message, 'error');
+            }).finally(() => {
+                hideNewModelForm();
+            });
+        }
+        return;
+    }
+
+    // Not editing: original create+train flow
     const newModel = {
         id: generateModelId(),
         name: name,
@@ -476,8 +564,46 @@ function saveCustomModel() {
 }
 
 function editModel(modelId) {
-    // In production, this would open an edit form
-    showStatusMessage('Edit functionality coming soon!', 'info');
+    // Open the new-model form and populate with existing metadata/training data
+    const model = customModels.find(m => m.id === modelId);
+    // If we have metadata in-memory, use that; otherwise fetch from backend
+    const populate = (meta) => {
+        const form = document.getElementById('new-model-form');
+        if (!form) return;
+        showNewModelForm();
+        const nameEl = document.getElementById('new-model-name');
+        const descEl = document.getElementById('new-model-description');
+        const catEl = document.getElementById('new-model-category');
+        const namesEl = document.getElementById('custom-names-input');
+        if (nameEl) nameEl.value = meta.name || '';
+        if (descEl) descEl.value = meta.description || '';
+        if (catEl) catEl.value = meta.category || '';
+        if (namesEl) namesEl.value = meta.trainingData || '';
+
+        editingModelId = modelId;
+        originalTrainingData = meta.trainingData || '';
+        // focus name input for quick edits
+        if (nameEl) nameEl.focus();
+    };
+
+    if (model && model.trainingData !== undefined) {
+        populate(model);
+    } else {
+        // fetch metadata from backend
+        fetch('/api/custom_models')
+            .then(r => r.json())
+            .then(resp => {
+                const found = (resp.models || []).find(m => m.id === modelId);
+                if (found) {
+                    populate(found);
+                } else {
+                    showStatusMessage('Could not load model metadata for edit', 'error');
+                }
+            }).catch(err => {
+                console.error('Failed to fetch metadata for edit:', err);
+                showStatusMessage('Failed to load model metadata', 'error');
+            });
+    }
 }
 
 function deleteModel(modelId) {
