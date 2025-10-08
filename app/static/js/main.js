@@ -80,20 +80,24 @@ const generateButton = document.getElementById('generate-button');
 let lastTrainedCustomText = '';
 
 function updateLengthPlaceholder() {
-    const visualMode = document.getElementById('model-type') ? document.getElementById('model-type').value : null;
-    const selectedModel = visualMode === 'custom' ? 'custom' : modelSelect.value;
+    const modelTypeEl = document.getElementById('model-type');
+    const visualMode = modelTypeEl ? modelTypeEl.value : null;
+    // Prefer concrete hidden 'model' value when available (set by custom_models.js)
+    const modelHidden = document.getElementById('model-hidden');
+    const selectedModel = modelHidden && modelHidden.value ? modelHidden.value : (visualMode === 'custom' ? null : modelSelect.value);
     // Only update the placeholder when the user has selected Average mode.
     const mode = lengthModeSelect ? lengthModeSelect.value : null;
     if (mode !== 'average') {
         return;
     }
 
-    if (selectedModel === 'custom') {
+    if (!selectedModel) {
+        // no concrete model id to query (custom tab open but nothing selected)
         lengthInput.placeholder = 'default: 6';
         return;
     }
 
-    fetch(`/get_model_avg_length?model=${selectedModel}`)
+    fetch(`/get_model_avg_length?model=${encodeURIComponent(selectedModel)}`)
         .then(response => response.json())
         .then(data => {
             const prefix = data.is_default ? 'default: ' : 'average: ';
@@ -131,9 +135,16 @@ if (lengthModeSelect) {
             lengthInput.value = '';
             lengthInput.disabled = true;
             lengthInput.removeAttribute('name');
-            const visualMode = document.getElementById('model-type') ? document.getElementById('model-type').value : null;
-            const selectedModel = visualMode === 'custom' ? 'custom' : modelSelect.value;
-            fetch(`/get_model_avg_length?model=${selectedModel}`)
+            const modelTypeEl = document.getElementById('model-type');
+            const visualMode = modelTypeEl ? modelTypeEl.value : null;
+            const modelHidden = document.getElementById('model-hidden');
+            const selectedModel = modelHidden && modelHidden.value ? modelHidden.value : (visualMode === 'custom' ? null : modelSelect.value);
+            if (!selectedModel) {
+                lengthInput.placeholder = 'average: 6';
+                return;
+            }
+
+            fetch(`/get_model_avg_length?model=${encodeURIComponent(selectedModel)}`)
                 .then(r => r.json())
                 .then(data => {
                     const prefix = data.is_default ? 'default: ' : 'average: ';
@@ -397,29 +408,34 @@ toggleButtons.forEach(button => {
             // store last template model
             lastTemplateModel = modelSelectEl.value;
 
-            // If the select has an option with value 'custom', set it. Otherwise create a hidden input
+            // If the select has an option with value 'custom', set it. Otherwise remove the select's name
+            // but DO NOT create a placeholder hidden input with value 'custom'. We only want a concrete
+            // hidden `model` field when the user explicitly selects a custom model (custom_models.js will
+            // create that). Creating a placeholder caused the backend to receive model=custom.
             const hasCustomOption = Array.from(modelSelectEl.options).some(o => o.value === 'custom');
             if (hasCustomOption) {
                 modelSelectEl.value = 'custom';
             } else {
-                // remove name from select so it doesn't submit
+                // remove name from select so it doesn't submit; do not create a placeholder hidden input
                 modelSelectEl.removeAttribute('name');
-                // add hidden input to submit model=custom
-                let hidden = document.getElementById('model-hidden');
-                if (!hidden) {
-                    hidden = document.createElement('input');
-                    hidden.type = 'hidden';
-                    hidden.id = 'model-hidden';
-                    hidden.name = 'model';
-                    hidden.value = 'custom';
-                    form.appendChild(hidden);
-                } else {
-                    hidden.value = 'custom';
-                }
+                const existingHidden = document.getElementById('model-hidden');
+                if (existingHidden) existingHidden.remove();
             }
 
             if (customNamesContainer) customNamesContainer.style.display = 'block';
             if (customNotice) customNotice.style.display = 'block';
+
+            // If a custom model was already selected (server-rendered or previously chosen),
+            // ensure we call the select handler so the concrete hidden `model` input is created.
+            try {
+                const preselected = document.getElementById('selected-custom-model');
+                if (preselected && preselected.value && typeof selectModel === 'function') {
+                    // call the shared select handler from custom_models.js
+                    selectModel(preselected.value);
+                }
+            } catch (e) {
+                console.warn('Could not auto-select preselected custom model:', e);
+            }
 
         } else {
             // restore template model

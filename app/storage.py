@@ -37,3 +37,28 @@ def load_model_from_s3(user_id, model_name, keras_dest, json_dest, meta_dest=Non
 
     with open(json_dest, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def get_model_metadata_from_s3(user_id, model_name):
+    """Attempt to load small metadata JSON for a custom model from S3.
+
+    Tries data.json first, then meta.json. Returns parsed JSON dict if found.
+    Raises FileNotFoundError if neither object exists.
+    """
+    base_prefix = f"{user_id}/{model_name}/"
+    candidates = ['data.json', 'meta.json']
+    for fname in candidates:
+        key = base_prefix + fname
+        try:
+            resp = s3.get_object(Bucket=BUCKET, Key=key)
+            body = resp['Body'].read()
+            return json.loads(body.decode('utf-8'))
+        except s3.exceptions.NoSuchKey:
+            # boto3 raises a ClientError for missing keys; fall through and try next
+            continue
+        except Exception:
+            # For other errors, let caller handle/log; continue to try next candidate
+            continue
+
+    # Not found
+    raise FileNotFoundError(f"No metadata JSON found for {user_id}/{model_name}")

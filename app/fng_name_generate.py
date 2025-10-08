@@ -3,12 +3,10 @@ import json
 import os
 from collections import Counter
 from app.fng_model import BigramPenaltyLoss
-from app.storage import load_model_from_s3
+from app.storage import load_model_from_s3, get_model_metadata_from_s3
 from app.model_cache import (
     get_model_from_cache, 
     put_model_in_cache,
-    clear_user_model_cache,
-    clear_all_model_caches,
     get_trigram_cache,
     put_trigram_cache
 )
@@ -45,6 +43,7 @@ def _normalize_custom_names(names):
 
 def load_model_data(model_name='my_model', user_id=None):
     """Load model with per-user caching and automatic cleanup."""
+
     # Use a default user_id if none provided
     cache_user_id = user_id if user_id is not None else 'default_user'
     
@@ -53,7 +52,8 @@ def load_model_data(model_name='my_model', user_id=None):
     if cached_data is not None:
         return cached_data
     
-    # Load the model
+    # Load the model --------------
+
     if model_name.startswith('custom'):
         if user_id is None:
             raise ValueError("user_id is required for custom models")
@@ -62,7 +62,7 @@ def load_model_data(model_name='my_model', user_id=None):
             keras_path = os.path.join(tmpdir, f"{model_name}.keras")
             json_path = os.path.join(tmpdir, f"{model_name}_data.json")
 
-            # use helper to download and load metadata
+            # download and load metadata
             data_dict = load_model_from_s3(user_id, model_name, keras_path, json_path)
 
             model = tf.keras.models.load_model(
@@ -70,8 +70,8 @@ def load_model_data(model_name='my_model', user_id=None):
                 custom_objects={'BigramPenaltyLoss': BigramPenaltyLoss}
             )
 
-    else:
-        # built-in (non-custom) models still on local disk
+    else: # template models are on local disk
+
         model_path = f'app/models/{model_name}.keras'
         data_path = f'app/models/{model_name}_data.json'
 
@@ -100,30 +100,56 @@ def load_model_data(model_name='my_model', user_id=None):
 
     return result
 
-
-def clear_model_cache(user_id=None):
-    """Clear cached models. If user_id provided, clear only that user's cache."""
-    if user_id is not None:
-        clear_user_model_cache(user_id)
-    else:
-        clear_all_model_caches()
-
-
-def get_avg_length(model_name):
+def get_avg_length(model_name, user_id=None):
     """Get average length and whether it's a default or actual average."""
+    cache_user_id = user_id if user_id is not None else 'default_user'
     try:
-        if model_name.startswith('custom'):
-            data_path = f'app/models/custom/{model_name}_data.json'
-        else:
-            data_path = f'app/models/{model_name}_data.json'
+        print(f"[fng] checking cache for model={model_name} user={cache_user_id}")
+        cached_data = get_model_from_cache(cache_user_id, model_name)
+    except Exception as e:
+        print(f"[fng] error accessing cache for {model_name} (user={cache_user_id}): {e}")
+        cached_data = None
+
+    if cached_data is not None:
+        print(f"[fng] cache hit for model={model_name} user={cache_user_id} avg_length={cached_data[7]}")
+        return cached_data[7], False
+
+    print(f"[fng] cache miss for model={model_name} user={cache_user_id}")
+
+    # Cache miss: for custom models try a metadata-only S3 fetch (lightweight)
+    if model_name.startswith('custom'):
+        if user_id is None:
+            print(f"[fng] no user_id supplied for custom model {model_name}; returning default")
+            return 6, True
+        try:
+            meta = get_model_metadata_from_s3(user_id, model_name)
+            if isinstance(meta, dict) and 'avg_length' in meta:
+                print(f"[fng] found avg_length in S3 metadata for {user_id}/{model_name}: {meta.get('avg_length')}")
+                return int(meta['avg_length']), False
+            print(f"[fng] S3 metadata exists but no avg_length for {user_id}/{model_name}")
+            return 6, True
+        except FileNotFoundError:
+            print(f"[fng] no S3 metadata found for {user_id}/{model_name}; returning default")
+            return 6, True
+        except Exception as e:
+            print(f"[fng] error fetching S3 metadata for {user_id}/{model_name}: {e}")
+            return 6, True
+
+    # Non-custom fallback: read local data.json file (existing behavior)
+    try:
+        data_path = f'app/models/{model_name}_data.json'
         with open(data_path, 'r', encoding='utf-8') as file:
             data_dict = json.load(file)
-
-        if 'avg_length' in data_dict:
-            return int(data_dict['avg_length']), False
-        else:
+            if 'avg_length' in data_dict:
+                print(f"[fng] found avg_length in local data for {model_name}: {data_dict.get('avg_length')}")
+                return int(data_dict['avg_length']), False
+            print(f"[fng] local data present but no avg_length for {model_name}")
             return 6, True
     except FileNotFoundError:
+        print(f"[fng] local data file not found for {model_name}; returning default")
+        return 6, True
+    except Exception as e:
+        print(f"[fng] error reading local data for {model_name}: {e}")
         return 6, True
 
 

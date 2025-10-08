@@ -35,6 +35,17 @@ let selectedModelId = null;
 let editingModelId = null; // when editing an existing model, this holds its id
 let originalTrainingData = null;
 
+// If the server (or previous client state) stored a selected model id in the hidden
+// field, initialize our in-memory selection so loadCustomModels can reapply it.
+try {
+    const preselected = document.getElementById('selected-custom-model');
+    if (preselected && preselected.value) {
+        selectedModelId = preselected.value;
+    }
+} catch (e) {
+    // non-critical
+}
+
 // Initialize the interface
 document.addEventListener('DOMContentLoaded', function() {
     // If an initializeInterface function exists in another script, it will run there.
@@ -94,6 +105,18 @@ function loadCustomModels() {
                 }));
             }
             renderModelsList();
+            // Reapply selection if previously selected model still exists
+            if (selectedModelId) {
+                const exists = customModels.some(m => m.id === selectedModelId);
+                if (exists) selectModel(selectedModelId);
+                else {
+                    selectedModelId = null;
+                    const hidden = document.getElementById('selected-custom-model'); if (hidden) hidden.value = '';
+                    const modelHidden = document.getElementById('model-hidden'); if (modelHidden) modelHidden.remove();
+                        // Refresh placeholder if needed
+                        try { if (typeof updateLengthPlaceholder === 'function') updateLengthPlaceholder(); } catch(e) {}
+                }
+            }
         })
         .catch(err => {
             console.error('Error loading custom models:', err);
@@ -200,27 +223,44 @@ function selectModel(modelId) {
     selectedModelId = modelId;
     const model = customModels.find(m => m.id === modelId);
 
-    if (model) {
-        // Update UI
-        const display = document.getElementById('selected-model-display');
-        if (display) display.textContent = model.name;
-        // Update the text.
-        const info = document.getElementById('selected-model-info');
-        if (info) {
-            /* no-op: keep layout controlled by CSS only */
+    if (!model) return;
+
+    // Update UI display
+    const display = document.getElementById('selected-model-display');
+    if (display) display.textContent = model.name;
+
+    // Keep a hidden field with the selected id for custom-only endpoints
+    const selectedHidden = document.getElementById('selected-custom-model');
+    if (selectedHidden) selectedHidden.value = modelId;
+
+    // Ensure a concrete hidden input named 'model' is present so the main form posts the concrete id
+    try {
+        const form = document.getElementById('name-generator-form');
+        if (form) {
+            let modelHidden = document.getElementById('model-hidden');
+            if (!modelHidden) {
+                modelHidden = document.createElement('input');
+                modelHidden.type = 'hidden';
+                modelHidden.id = 'model-hidden';
+                modelHidden.name = 'model';
+                form.appendChild(modelHidden);
+            }
+            modelHidden.value = modelId;
         }
-        const hidden = document.getElementById('selected-custom-model');
-        if (hidden) hidden.value = modelId;
-
-        // Update last used
-        model.lastUsed = Date.now();
-
-        // Re-render to update selection
-        renderModelsList();
-
-        // Hide new model form if open
-        hideNewModelForm();
+    } catch (e) {
+        console.warn('Could not ensure model-hidden input:', e);
     }
+
+    // Update last used
+    model.lastUsed = Date.now();
+
+    // Re-render to update selection highlight
+    renderModelsList();
+
+    // Hide new model form if open
+    hideNewModelForm();
+        // Refresh placeholder if needed
+        try { if (typeof updateLengthPlaceholder === 'function') updateLengthPlaceholder(); } catch(e) {}
 }
 
 function showNewModelForm() {
@@ -615,12 +655,16 @@ function deleteModel(modelId) {
             if (resp && resp.success) {
                 showStatusMessage('Model deleted successfully', 'success');
                 if (selectedModelId === modelId) {
-                        selectedModelId = null;
-                        // Clear the displayed model name but keep the info box visible so layout stays stable.
-                        const display = document.getElementById('selected-model-display'); if (display) display.textContent = '';
-                        const hidden = document.getElementById('selected-custom-model'); if (hidden) hidden.value = '';
-                        // Do not change inline styles on #selected-model-info.
+            selectedModelId = null;
+            // Clear the displayed model name but keep the info box visible so layout stays stable.
+            const display = document.getElementById('selected-model-display'); if (display) display.textContent = '';
+            const hidden = document.getElementById('selected-custom-model'); if (hidden) hidden.value = '';
+            // Remove any concrete model hidden input so we don't accidentally submit a stale id
+            const modelHidden = document.getElementById('model-hidden'); if (modelHidden) modelHidden.remove();
+            // Do not change inline styles on #selected-model-info.
                 }
+                    // Ask the main UI to refresh avg-length placeholder when a model is removed
+                    try { if (typeof updateLengthPlaceholder === 'function') updateLengthPlaceholder(); } catch(e) {}
                 loadCustomModels();
             } else {
                 showStatusMessage('Failed to delete model', 'error');
