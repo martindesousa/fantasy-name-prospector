@@ -602,7 +602,7 @@ function saveCustomModel() {
                     if (resp.model_id) newModel.id = resp.model_id;
                     loadCustomModels();
                     selectModel(newModel.id);
-                    showStatusMessage('Model metadata saved — starting training...', 'info');
+                    showStatusMessage('Model information saved — starting training...', 'info');
                     startTraining({ trainingData: newModel.trainingData, name: newModel.name, category: newModel.category, description: newModel.description });
                     // If we were editing an existing model, delete the old model artifacts to avoid duplicates
                     if (existingId && resp.model_id && resp.model_id !== existingId) {
@@ -613,7 +613,6 @@ function saveCustomModel() {
                                     // remove from local list and refresh
                                     customModels = customModels.filter(m => m.id !== existingId);
                                     renderModelsList();
-                                    showStatusMessage('Previous model removed', 'info');
                                 } else {
                                     console.warn('Failed to delete previous model:', delResp);
                                 }
