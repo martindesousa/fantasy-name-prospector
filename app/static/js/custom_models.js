@@ -92,7 +92,7 @@ function loadCustomModels() {
         .then(r => r.json())
         .then(data => {
             if (data && data.models) {
-                // normalize model objects
+                // normalize model objects but DO NOT include trainingData here (fetch on-demand)
                 customModels = data.models.map(m => ({
                     id: m.id,
                     name: m.name || m.id,
@@ -100,8 +100,7 @@ function loadCustomModels() {
                     category: m.category || 'uncategorized',
                     nameCount: m.nameCount || 0,
                     createdAt: m.createdAt || Date.now(),
-                    lastUsed: m.lastUsed || Date.now(),
-                    trainingData: m.trainingData || ''
+                    lastUsed: m.lastUsed || Date.now()
                 }));
             }
             renderModelsList();
@@ -606,44 +605,44 @@ function saveCustomModel() {
 function editModel(modelId) {
     // Open the new-model form and populate with existing metadata/training data
     const model = customModels.find(m => m.id === modelId);
-    // If we have metadata in-memory, use that; otherwise fetch from backend
-    const populate = (meta) => {
-        const form = document.getElementById('new-model-form');
-        if (!form) return;
-        showNewModelForm();
-        const nameEl = document.getElementById('new-model-name');
-        const descEl = document.getElementById('new-model-description');
-        const catEl = document.getElementById('new-model-category');
-        const namesEl = document.getElementById('custom-names-input');
-        if (nameEl) nameEl.value = meta.name || '';
-        if (descEl) descEl.value = meta.description || '';
-        if (catEl) catEl.value = meta.category || '';
-        if (namesEl) namesEl.value = meta.trainingData || '';
+    // Show the edit form immediately with lightweight metadata, then fetch full metadata (including trainingData)
+    const form = document.getElementById('new-model-form');
+    if (!form) return;
+    showNewModelForm();
+    const nameEl = document.getElementById('new-model-name');
+    const descEl = document.getElementById('new-model-description');
+    const catEl = document.getElementById('new-model-category');
+    const namesEl = document.getElementById('custom-names-input');
 
-        editingModelId = modelId;
-        originalTrainingData = meta.trainingData || '';
-        // focus name input for quick edits
-        if (nameEl) nameEl.focus();
-    };
-
-    if (model && model.trainingData !== undefined) {
-        populate(model);
-    } else {
-        // fetch metadata from backend
-        fetch('/api/custom_models')
-            .then(r => r.json())
-            .then(resp => {
-                const found = (resp.models || []).find(m => m.id === modelId);
-                if (found) {
-                    populate(found);
-                } else {
-                    showStatusMessage('Could not load model metadata for edit', 'error');
-                }
-            }).catch(err => {
-                console.error('Failed to fetch metadata for edit:', err);
-                showStatusMessage('Failed to load model metadata', 'error');
-            });
+    // Populate from lightweight in-memory metadata if available
+    if (model) {
+        if (nameEl) nameEl.value = model.name || '';
+        if (descEl) descEl.value = model.description || '';
+        if (catEl) catEl.value = model.category || '';
     }
+
+    // Fetch the full metadata (server returns meta including trainingData)
+    fetch('/api/custom_models/' + encodeURIComponent(modelId))
+        .then(r => r.json())
+        .then(resp => {
+            if (resp && resp.meta) {
+                const meta = resp.meta;
+                if (nameEl) nameEl.value = meta.name || '';
+                if (descEl) descEl.value = meta.description || '';
+                if (catEl) catEl.value = meta.category || '';
+                if (namesEl) namesEl.value = meta.trainingData || '';
+
+                editingModelId = modelId;
+                originalTrainingData = meta.trainingData || '';
+                if (nameEl) nameEl.focus();
+            } else {
+                showStatusMessage('Could not load model metadata for edit', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('Failed to fetch metadata for edit:', err);
+            showStatusMessage('Failed to load model metadata', 'error');
+        });
 }
 
 function deleteModel(modelId) {

@@ -36,7 +36,7 @@ def progress_callback(current_epoch, total_epochs):
 def home():
     # Get default avg_length from a default model (or set a fallback)
     try:
-        avg_length = fng_name_generate.get_avg_length('my_model')  # or whatever your default model is
+        avg_length = fng_name_generate.get_avg_length('american_classic') 
     except:
         avg_length = 6  # fallback
     
@@ -137,6 +137,13 @@ def api_list_custom_models():
             if 'createdAt' not in meta or not meta.get('createdAt'):
                 meta['createdAt'] = obj.get('LastModified').isoformat() if obj.get('LastModified') else int(time.time() * 1000)
 
+            # Do not send full training data in the list response to avoid large payloads
+            if 'trainingData' in meta:
+                try:
+                    del meta['trainingData']
+                except Exception:
+                    meta['trainingData'] = None
+
             models.append(meta)
     except Exception as e:
         print('Error listing models from S3:', e)
@@ -144,6 +151,40 @@ def api_list_custom_models():
     response = jsonify({'models': models})
     if cookie_resp:
         # set cookie if get_user_id created one
+        response.set_cookie('user_id', user_id, max_age=60*60*24*30)
+    return response
+
+
+@app.route('/api/custom_models/<model_id>', methods=['GET'])
+def api_get_custom_model(model_id):
+    """Return full metadata for a single custom model (including trainingData)."""
+    try:
+        user_id, cookie_resp = storage.get_user_id()
+    except Exception:
+        user_id = request.cookies.get('user_id') or None
+        cookie_resp = None
+
+    s3 = storage.s3
+    bucket = storage.BUCKET
+    if s3 is None:
+        return jsonify({'error': 'S3 not configured'}), 500
+
+    key = f"{user_id}/{model_id}.meta.json"
+    try:
+        body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
+        meta = json.loads(body)
+    except Exception as e:
+        return jsonify({'error': 'Model not found'}), 404
+
+    # Ensure id and reasonable fields
+    meta['id'] = meta.get('id') or model_id
+    if 'name' not in meta or not meta.get('name'):
+        meta['name'] = meta['id']
+    if 'createdAt' not in meta or not meta.get('createdAt'):
+        meta['createdAt'] = int(time.time() * 1000)
+
+    response = jsonify({'meta': meta})
+    if cookie_resp:
         response.set_cookie('user_id', user_id, max_age=60*60*24*30)
     return response
 
@@ -321,33 +362,65 @@ def stream_progress():
         
         # First, yield a preparation message
         yield f"data: {json.dumps({'type': 'preparing', 'message': 'Preparing to process your request...', 'progress': 0})}\n\n"
-        
-        # Generation-only: if custom model is selected, attempt to load it from S3
-        if selected_model == 'custom':
-            # prefer an explicitly selected custom model id; otherwise compute from provided names
-            user_id, _ = storage.get_user_id()
-            selected_custom = request.form.get('selected_custom_model', '').strip()
-            if selected_custom:
-                model_name = selected_custom
-                # Load the training data from metadata
-                try:
-                    s3 = storage.s3
-                    bucket = storage.BUCKET
-                    key = f"{user_id}/{model_name}.meta.json"
-                    body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
-                    meta = json.loads(body)
-                    raw_custom = meta.get('trainingData', '')
-                    custom_names = raw_custom.splitlines()
-                except Exception:
-                    custom_names = []
-            else:
-                raw_custom = request.form.get('custom-names-input', '')
-                custom_names = raw_custom.splitlines()
-                model_hash = hashlib.md5("\n".join(custom_names).encode('utf-8')).hexdigest()
-                model_name = f"custom_{model_hash}"
 
-            # Attempt to load custom model data from S3; fng_name_generate will raise if not present
+        # If a using custom model, resolve the model name and ensure we pass a user_id when loading data.
+        if selected_model.startswith('custom'):
+            # Resolve user_id (required for loading saved custom model artifacts)
             try:
+                print("[app] setting user_id from storage")
+                user_id, _ = storage.get_user_id()
+                print("user id resolved to", user_id)
+            except Exception:
+                user_id = request.cookies.get('user_id') or None
+
+            # Determine the model_name and training names
+            if selected_model == 'custom':
+                # prefer an explicitly selected custom model id from the hidden field
+                selected_custom = request.form.get('selected_custom_model', '').strip()
+                if selected_custom:
+                    model_name = selected_custom
+                    # Load the training data from metadata if available (best-effort)
+                    try:
+                        s3 = storage.s3
+                        bucket = storage.BUCKET
+                        key = f"{user_id}/{model_name}.meta.json" if user_id else None
+                        if key:
+                            body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
+                            meta = json.loads(body)
+                            raw_custom = meta.get('trainingData', '')
+                            custom_names = raw_custom.splitlines()
+                        else:
+                            custom_names = []
+                    except Exception:
+                        custom_names = []
+                else:
+                    raw_custom = request.form.get('custom-names-input', '')
+                    custom_names = raw_custom.splitlines()
+                    model_hash = hashlib.md5("\n".join(custom_names).encode('utf-8')).hexdigest()
+                    model_name = f"custom_{model_hash}"
+            else:
+                # The form posted a concrete custom model id directly (e.g. 'custom_<hash>')
+                model_name = selected_model
+                # Get training names by loading metadata from S3; do so if we have user_id
+                if user_id:
+                    try:
+                        s3 = storage.s3
+                        bucket = storage.BUCKET
+                        key = f"{user_id}/{model_name}.meta.json"
+                        body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
+                        meta = json.loads(body)
+                        raw_custom = meta.get('trainingData', '')
+                        custom_names = raw_custom.splitlines()
+                    except Exception:
+                        custom_names = []
+                else:
+                    # No user_id available
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'user_id is required for custom models', 'progress': 0})}\n\n"
+                    return
+
+            # Attempt to load custom model data from S3; pass user_id so fng_name_generate can find per-user artifacts
+            try:
+                print("[app] loading custom model data for model_name=", model_name, " user_id=", user_id)
                 model, X, y, char_to_idx, idx_to_char, char_set, bigram_counts, avg_length = fng_name_generate.load_model_data(model_name, user_id=user_id)
             except Exception as e:
                 # Stream an error and stop
@@ -376,7 +449,7 @@ def stream_progress():
             temperature=temperature,
             custom_names=custom_names if selected_model == 'custom' else None,
             length_mode=length_mode,
-            user_id=user_id if selected_model == 'custom' else None
+            user_id=user_id if selected_model.startswith('custom') else None
         )
 
         generated_names = []
