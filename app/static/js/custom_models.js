@@ -356,6 +356,10 @@ function selectModel(modelId) {
 }
 
 function showNewModelForm() {
+    // If we were previously editing, clear that state so Create New always starts fresh
+    try { editingModelId = null; originalTrainingData = null; } catch (e) {}
+    try { clearNewModelForm(); } catch (e) {}
+
     const form = document.getElementById('new-model-form');
     if (!form) return;
     form.style.display = 'block';
