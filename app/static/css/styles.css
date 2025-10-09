@@ -539,3 +539,60 @@ body {
     background: var(--accent-color);
     border-radius: 0;
 }
+
+/* Custom textarea resize wrapper for training names */
+.textarea-resize-wrapper {
+    position: relative;
+}
+
+.custom-resize-textarea {
+    resize: none; /* We'll provide a custom, smoother resize */
+    overflow: auto;
+    transition: height 220ms cubic-bezier(.2,.8,.2,1); /* smooth size change */
+}
+
+/* Make the resize handle more obvious and larger */
+.resize-handle {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 3px;
+    cursor: se-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.resize-handle::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background-image: linear-gradient(45deg, rgba(0,0,0,0.35) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.35) 75%, transparent 75%, transparent);
+    background-size: 4px 4px;
+    opacity: 0.6;
+}
+
+/* Live name count badge */
+.names-count {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    background: rgba(0,0,0,0.45);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    border: 1px solid rgba(255,255,255,0.04);
+}
+
+#new-model-description {
+    max-height: 140px;
+    overflow: auto;
+    transition: height 180ms cubic-bezier(.2,.8,.2,1);
+    resize: vertical; 
+}

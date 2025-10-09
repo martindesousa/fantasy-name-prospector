@@ -138,8 +138,16 @@
                                                 &#8226; Male: &amp;lt;M&amp;gt; John<br>
                                                 &#8226; Neutral: No tag needed.
                                                 "></i>
-                                    <textarea id="custom-names-input" name="custom-names-input" rows="6" class="form-control" 
-                                              placeholder="Enter names here (one per line)...&#10;Name_1&#10;Name_2&#10;Name_3&#10;...&#10;"></textarea>
+
+                                    <div class="textarea-resize-wrapper" style="position:relative;">
+                                        <textarea id="custom-names-input" name="custom-names-input" rows="7" class="form-control custom-resize-textarea" 
+                                                  placeholder="Enter names here (one per line)...&#10;Name_1&#10;Name_2&#10;Name_3&#10;...&#10;"></textarea>
+
+                                        <!-- Larger visual handle and live count -->
+                                        <div id="custom-names-count" class="names-count">0 names</div>
+                                        <div id="custom-resize-handle" class="resize-handle" title="Drag to resize" aria-hidden="true"></div>
+                                    </div>
+
                                     <div class="custom-notice">
                                         <i class="bi bi-info-circle"></i> 
                                         <strong>Tip:</strong> Add at least 20 names for better results. More names = better quality!
