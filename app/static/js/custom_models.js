@@ -86,6 +86,99 @@ function setupEventListeners() {
     }
 }
 
+// Live line count and custom resize for training textarea
+function initCustomNamesEnhancements() {
+    const textarea = document.getElementById('custom-names-input');
+    const countBadge = document.getElementById('custom-names-count');
+    const handle = document.getElementById('custom-resize-handle');
+
+    if (!textarea) return;
+
+    function updateCount() {
+        const lines = textarea.value.split('\n').filter(l => l.trim());
+        const n = lines.length;
+        if (countBadge) countBadge.textContent = `${n} ${n === 1 ? 'name' : 'names'}`;
+    }
+    window.updateCustomNamesCount = updateCount;
+
+    // Initial count
+    updateCount();
+
+    // Update on input (typing, paste)
+    textarea.addEventListener('input', updateCount);
+
+    // Also update when other code modifies the textarea
+    const observer = new MutationObserver(updateCount);
+    observer.observe(textarea, { characterData: true, childList: true, subtree: true });
+
+    // Implement smooth drag-to-resize using the custom handle
+    if (!handle) return;
+
+    let startY = 0;
+    let startHeight = 0;
+    let dragging = false;
+
+    const onPointerDown = (e) => {
+        e.preventDefault();
+        dragging = true;
+        startY = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || 0;
+        startHeight = textarea.getBoundingClientRect().height;
+        document.documentElement.style.userSelect = 'none';
+        handle.classList.add('active');
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+    };
+
+    const onPointerMove = (e) => {
+        if (!dragging) return;
+        const clientY = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || 0;
+        const dy = clientY - startY;
+        const newHeight = Math.max(80, startHeight + dy);
+        textarea.style.height = newHeight + 'px';
+    };
+
+    const onPointerUp = (e) => {
+        dragging = false;
+        document.documentElement.style.userSelect = '';
+        handle.classList.remove('active');
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        updateCount();
+    };
+
+    handle.addEventListener('pointerdown', onPointerDown, { passive: false });
+
+    // Keyboard accessibility: allow +/- keys on handle to increase/decrease height
+    handle.tabIndex = 0;
+    handle.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+            textarea.style.height = (textarea.clientHeight - 20) + 'px';
+            e.preventDefault();
+            updateCount();
+        } else if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+            textarea.style.height = (textarea.clientHeight + 20) + 'px';
+            e.preventDefault();
+            updateCount();
+        }
+    });
+}
+
+// Initialize enhancements when DOM ready
+document.addEventListener('DOMContentLoaded', function() {
+    try { initCustomNamesEnhancements(); } catch (e) { console.warn('Custom names enhancements failed', e); }
+});
+
+// Function to set the new-model form header text based on if editing or not
+function setNewModelHeaderEditing(isEditing, modelId) {
+    const header = document.querySelector('#new-model-form h6');
+    if (!header) return;
+    if (isEditing) {
+        header.innerHTML = `<img src="/static/images/SettingsGear.png" alt="Settings" style="width:20px;height:20px;object-fit:contain;margin-right:1px;vertical-align:middle;"> Editing Custom Model`;
+    } else {
+        header.innerHTML = `<i class="bi bi-plus-circle"></i> Create New Custom Model`;
+    }
+}
+
 function loadCustomModels() {
     // Load from backend
     fetch('/api/custom_models')
@@ -263,12 +356,20 @@ function selectModel(modelId) {
 }
 
 function showNewModelForm() {
+    // If we were previously editing, clear that state so Create New always starts fresh
+    try { editingModelId = null; originalTrainingData = null; } catch (e) {}
+    try { clearNewModelForm(); } catch (e) {}
+
     const form = document.getElementById('new-model-form');
     if (!form) return;
     form.style.display = 'block';
     form.classList.add('active');
     const nameInput = document.getElementById('new-model-name');
     if (nameInput) nameInput.focus();
+    // Ensure header shows Create mode
+    try { setNewModelHeaderEditing(false); } catch (e) {}
+    // Update the live names counter (in case the textarea was prefilled or needs resetting)
+    try { if (typeof window.updateCustomNamesCount === 'function') window.updateCustomNamesCount(); } catch (e) {}
 
     // Smooth scroll the form into view and flash its outline once to draw attention
     try {
@@ -307,6 +408,9 @@ function clearNewModelForm() {
     if (desc) desc.classList.remove('input-error');
     if (names) names.classList.remove('input-error');
     if (cat) cat.classList.remove('input-error');
+
+    // Update counter after clearing
+    try { if (typeof window.updateCustomNamesCount === 'function') window.updateCustomNamesCount(); } catch (e) {}
 }
 
 // Start training by POSTing to /train and streaming SSE updates
@@ -458,11 +562,11 @@ function saveCustomModel() {
             .then(r => r.json())
             .then(resp => {
                 if (resp && resp.success) {
-                    showStatusMessage('Model metadata updated', 'success');
+                    showStatusMessage('Model information updated', 'success');
                     loadCustomModels();
                     selectModel(existingId);
                 } else {
-                    showStatusMessage('Failed to update model metadata', 'error');
+                    showStatusMessage('Failed to update model information', 'error');
                 }
             }).catch(err => {
                 console.error('Update error:', err);
@@ -609,6 +713,8 @@ function editModel(modelId) {
     const form = document.getElementById('new-model-form');
     if (!form) return;
     showNewModelForm();
+    // Set header to editing immediately to avoid jank while metadata loads
+    try { setNewModelHeaderEditing(true, modelId); } catch(e) {}
     const nameEl = document.getElementById('new-model-name');
     const descEl = document.getElementById('new-model-description');
     const catEl = document.getElementById('new-model-category');
@@ -634,6 +740,9 @@ function editModel(modelId) {
 
                 editingModelId = modelId;
                 originalTrainingData = meta.trainingData || '';
+                // Set header to editing mode and update count
+                try { setNewModelHeaderEditing(true, modelId); } catch(e){}
+                try { if (typeof window.updateCustomNamesCount === 'function') window.updateCustomNamesCount(); } catch(e){}
                 if (nameEl) nameEl.focus();
             } else {
                 showStatusMessage('Could not load model metadata for edit', 'error');

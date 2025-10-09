@@ -266,8 +266,8 @@ form.addEventListener('submit', function(event) {
                                             if (!spacer) {
                                                 spacer = document.createElement('div');
                                                 spacer.id = 'results-spacer';
-                                                // tune height as needed (320px is a reasonable default)
-                                                spacer.style.height = '320px';
+                                                // tune height as needed
+                                                spacer.style.height = '240px';
                                                 spacer.style.pointerEvents = 'none';
                                                 document.body.appendChild(spacer);
                                             }
