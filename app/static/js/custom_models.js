@@ -173,7 +173,7 @@ function setNewModelHeaderEditing(isEditing, modelId) {
     const header = document.querySelector('#new-model-form h6');
     if (!header) return;
     if (isEditing) {
-        header.innerHTML = `<i class="bi bi-pencil-square"></i> Editing Custom Model`;
+        header.innerHTML = `<img src="/static/images/SettingsGear.png" alt="Settings" style="width:20px;height:20px;object-fit:contain;margin-right:1px;vertical-align:middle;"> Editing Custom Model`;
     } else {
         header.innerHTML = `<i class="bi bi-plus-circle"></i> Create New Custom Model`;
     }
@@ -709,6 +709,8 @@ function editModel(modelId) {
     const form = document.getElementById('new-model-form');
     if (!form) return;
     showNewModelForm();
+    // Set header to editing immediately to avoid jank while metadata loads
+    try { setNewModelHeaderEditing(true, modelId); } catch(e) {}
     const nameEl = document.getElementById('new-model-name');
     const descEl = document.getElementById('new-model-description');
     const catEl = document.getElementById('new-model-category');
