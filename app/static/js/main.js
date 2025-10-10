@@ -1,3 +1,4 @@
+
 // Main form
 const form = document.getElementById('name-generator-form');
 
@@ -14,6 +15,14 @@ const progressBar = document.getElementById('progress-bar');
 
 // Reference to the inline spinner (Swap this out on errors)
 let spinnerEl = loadingDiv ? loadingDiv.querySelector('.spinner-border') : null;
+
+// Reference to generate and cancel buttons
+const generateButton = document.getElementById('generate-button');
+const cancelButton = document.getElementById('cancel-generate-button');
+
+// Track generation state
+let isGenerating = false;
+let abortController = null;
 
 // Create a fresh spinner element (so we can restore it after showing the warning image)
 function createSpinner() {
@@ -56,7 +65,6 @@ function showWarningImage() {
 }
 
 // Function to restore spinner (remove warning image if present and ensure spinner exists)
-
 function restoreSpinner() {
     if (!loadingDiv) return;
     const warning = loadingDiv.querySelector('#loading-warning-image');
@@ -74,9 +82,6 @@ function restoreSpinner() {
 const modelSelect = document.getElementById('model');
 const customNamesContainer = document.getElementById('custom-names-input') || document.getElementById('custom-names-container');
 const customNotice = document.getElementById('custom-notice');
-
-// Reference to generate button
-const generateButton = document.getElementById('generate-button');
 
 function updateLengthPlaceholder() {
     const modelTypeEl = document.getElementById('model-type');
@@ -166,9 +171,33 @@ if (lengthModeSelect) {
     lengthModeSelect.dispatchEvent(new Event('change'));
 }
 
+// Cancel button handler
+if (cancelButton) {
+    cancelButton.addEventListener('click', function() {
+        if (abortController) {
+            abortController.abort();
+            loadingText.textContent = 'Generation cancelled';
+            showWarningImage();
+            
+            // Hide cancel button and loading after a brief delay
+            setTimeout(() => {
+                loadingDiv.style.display = 'none';
+                isGenerating = false;
+                generateButton.disabled = false;
+                cancelButton.style.display = 'none';
+            }, 1500);
+        }
+    });
+}
+
 // Form submit handler with streaming progress
 form.addEventListener('submit', function(event) {
     event.preventDefault();
+
+    // Prevent multiple simultaneous generations
+    if (isGenerating) {
+        return;
+    }
 
     const prefixText = prefixInput.value;
     const lengthMode = lengthModeSelect ? lengthModeSelect.value : 'average';
@@ -185,9 +214,18 @@ form.addEventListener('submit', function(event) {
         lengthInput.classList.remove('input-error');
     }
 
+    // Set generation state and disable generate button
+    isGenerating = true;
+    generateButton.disabled = true;
+
+    // Create new AbortController for this request
+    abortController = new AbortController();
+
     loadingDiv.style.display = 'block';
     loadingText.textContent = 'Preparing...';
     progressBar.style.width = '0%';
+    cancelButton.style.display = 'inline-block';
+    
     // ensure spinner visible (in case previous action showed the warning image)
     restoreSpinner();
 
@@ -202,6 +240,7 @@ form.addEventListener('submit', function(event) {
     fetch('/stream_progress', {
         method: 'POST',
         body: formData,
+        signal: abortController.signal
     }).then(response => {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -210,6 +249,10 @@ form.addEventListener('submit', function(event) {
             return reader.read().then(({ done, value }) => {
                 if (done) {
                     console.log('Stream complete');
+                    // Re-enable generation
+                    isGenerating = false;
+                    generateButton.disabled = false;
+                    cancelButton.style.display = 'none';
                     return;
                 }
 
@@ -238,7 +281,6 @@ form.addEventListener('submit', function(event) {
                                     // ensure spinner is visible if previously replaced
                                     restoreSpinner();
                                     break;
-                                // 'preparing' handled above together with loading/training
 
                                 case 'generating':
                                     loadingDiv.style.display = 'block';
@@ -319,6 +361,9 @@ form.addEventListener('submit', function(event) {
 
                                 case 'complete':
                                     loadingDiv.style.display = 'none';
+                                    isGenerating = false;
+                                    generateButton.disabled = false;
+                                    cancelButton.style.display = 'none';
 
                                     // Remove any temporary spacer we added earlier
                                     const spacerFinal = document.getElementById('results-spacer');
@@ -344,6 +389,9 @@ form.addEventListener('submit', function(event) {
                                 case 'error':
                                     loadingText.textContent = "Error: " + jsonData.message;
                                     loadingDiv.style.display = 'block';
+                                    isGenerating = false;
+                                    generateButton.disabled = false;
+                                    cancelButton.style.display = 'none';
                                     // replace spinner with warning image
                                     showWarningImage();
                                     break;
@@ -352,6 +400,9 @@ form.addEventListener('submit', function(event) {
                             console.error('Error parsing SSE data:', e);
                             // show warning image for parsing/stream issues
                             loadingText.textContent = 'Error: stream parsing failed';
+                            isGenerating = false;
+                            generateButton.disabled = false;
+                            cancelButton.style.display = 'none';
                             showWarningImage();
                         }
                     }
@@ -364,7 +415,19 @@ form.addEventListener('submit', function(event) {
         return processStream();
     }).catch(error => {
         console.error('Fetch error:', error);
+        
+        // Check if this was an abort (user cancelled)
+        if (error.name === 'AbortError') {
+            console.log('Request was cancelled by user');
+            // Don't show error message for user-initiated cancellations
+            // The cancel button handler already updated the UI
+            return;
+        }
+        
         loadingText.textContent = 'Error: ' + error.message;
+        isGenerating = false;
+        generateButton.disabled = false;
+        cancelButton.style.display = 'none';
         showWarningImage();
     });
 });
