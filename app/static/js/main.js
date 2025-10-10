@@ -1,4 +1,3 @@
-
 // Main form
 const form = document.getElementById('name-generator-form');
 
@@ -23,6 +22,26 @@ const cancelButton = document.getElementById('cancel-generate-button');
 // Track generation state
 let isGenerating = false;
 let abortController = null;
+
+// Event delegation for name item clicks - one listener for name items
+// Attached to container-fluid so it works even when name-grid doesn't exist yet
+document.querySelector('.container-fluid').addEventListener('click', function(e) {
+    // Check if the clicked element is a name-item (or inside one)
+    const nameItem = e.target.closest('.name-item');
+    if (nameItem) {
+        const name = nameItem.textContent;
+        navigator.clipboard.writeText(name).then(() => {
+            // Store original background for restoration
+            const originalBg = nameItem.style.backgroundColor || '';
+            nameItem.style.backgroundColor = '#28a745';
+            setTimeout(() => {
+                nameItem.style.backgroundColor = originalBg;
+            }, 200);
+        }).catch(err => {
+            console.warn('Failed to copy to clipboard:', err);
+        });
+    }
+});
 
 // Create a fresh spinner element (so we can restore it after showing the warning image)
 function createSpinner() {
@@ -333,16 +352,7 @@ form.addEventListener('submit', function(event) {
                                         nameItem.className = 'name-item';
                                         nameItem.textContent = jsonData.name;
 
-                                        nameItem.addEventListener('click', function() {
-                                            navigator.clipboard.writeText(jsonData.name).then(() => {
-                                                const originalBg = nameItem.style.backgroundColor;
-                                                nameItem.style.backgroundColor = '#28a745';
-                                                setTimeout(() => {
-                                                    nameItem.style.backgroundColor = originalBg;
-                                                }, 200);
-                                            });
-                                        });
-
+                                        // No individual click listener needed - handled by event delegation above
                                         nameGrid.appendChild(nameItem);
 
                                         const countBadge = document.getElementById('name-count');
