@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Names To Prospect | Machine-Learning Name Generator</title>
+    <meta name="description" content="Create completely new culturally-styled names from real-life or fictional sources using machine learned models. Use templates or train custom datasets, and tweak parameters to your liking, then watch names generate in real time.">
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -49,7 +50,7 @@
                                     <label for="model" class="form-label">Select a Model</label>
                                     <select id="model" name="model" class="form-select">
                                         <option value="american_classic">American (Classic)</option>
-                                        <option value="american_new_age">American (New Age)</option>
+                                        <option value="american_new_age">American (Modern)</option>
                                         <option value="arabic">Arabic</option>
                                         <option value="aztec">Aztec</option>
                                         <option value="chinese">Chinese</option>
@@ -64,7 +65,7 @@
                                     <label for="gender" class="form-label">Gender
                                         <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
                                            data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
-                                           title="Determines the gender to use for the generated names."></i>
+                                           title="Determines the gender to use for the generated names. Since models don't interpret gender strictly, this is more of a guideline — it provides a token at the start to nudge the model toward typical patterns for that gender."></i>
                                     </label>
                                     <select id="gender" name="gender" class="form-select">
                                         <option value="neutral" selected>Neutral</option>
