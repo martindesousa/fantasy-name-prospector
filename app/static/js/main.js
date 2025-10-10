@@ -30,6 +30,7 @@ function createSpinner() {
 // Function to show the warning image in place of the spinner
 function showWarningImage() {
     if (!loadingDiv) return;
+
     // avoid duplicating
     if (loadingDiv.querySelector('#loading-warning-image')) return;
 
@@ -42,6 +43,7 @@ function showWarningImage() {
     img.id = 'loading-warning-image';
     img.src = '/static/images/WarningSign.webp';
     img.alt = 'Warning';
+
     // size similar to spinner
     img.style.width = '2rem';
     img.style.height = '2rem';
@@ -54,6 +56,7 @@ function showWarningImage() {
 }
 
 // Function to restore spinner (remove warning image if present and ensure spinner exists)
+
 function restoreSpinner() {
     if (!loadingDiv) return;
     const warning = loadingDiv.querySelector('#loading-warning-image');
@@ -71,13 +74,9 @@ function restoreSpinner() {
 const modelSelect = document.getElementById('model');
 const customNamesContainer = document.getElementById('custom-names-input') || document.getElementById('custom-names-container');
 const customNotice = document.getElementById('custom-notice');
-const customNamesText = document.getElementById('custom_names');
 
-const trainButton = document.getElementById('train-button');
+// Reference to generate button
 const generateButton = document.getElementById('generate-button');
-
-// Track the last custom text that was successfully trained
-let lastTrainedCustomText = '';
 
 function updateLengthPlaceholder() {
     const modelTypeEl = document.getElementById('model-type');
@@ -174,7 +173,6 @@ form.addEventListener('submit', function(event) {
     const prefixText = prefixInput.value;
     const lengthMode = lengthModeSelect ? lengthModeSelect.value : 'average';
     const nameLength = lengthMode === 'custom' ? parseInt(lengthInput.value) : null;
-    const customNamesTextValue = customNamesText ? customNamesText.value.trim() : '';
 
     if (lengthMode === 'custom' && prefixText.length > nameLength) {
         errorMessage.style.display = 'block';
@@ -203,7 +201,7 @@ form.addEventListener('submit', function(event) {
 
     fetch('/stream_progress', {
         method: 'POST',
-        body: formData
+        body: formData,
     }).then(response => {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -317,11 +315,6 @@ form.addEventListener('submit', function(event) {
                                     loadingText.textContent = "Training complete! Starting name generation...";
                                     // make sure spinner is present when moving to generation
                                     restoreSpinner();
-                                    if (modelSelect.value === 'custom') {
-                                        lastTrainedCustomText = customNamesText.value.trim();
-                                        trainButton.style.display = 'none';
-                                        generateButton.style.display = 'inline-block';
-                                    }
                                     break;
 
                                 case 'complete':
@@ -456,12 +449,6 @@ toggleButtons.forEach(button => {
         }
     });
 });
-
-// // Ensure custom tab shows textarea if model is custom on load
-// if (document.getElementById('model').value === 'custom') {
-//     const customBtn = Array.from(toggleButtons).find(b => b.getAttribute('data-type') === 'custom');
-//     if (customBtn) customBtn.click();
-// }
 
 // Initialize Bootstrap tooltips for any elements that use data-bs-toggle="tooltip"
 (function initTooltips() {
