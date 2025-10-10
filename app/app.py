@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, Response, stream_with_context, jsonify, make_response
+from flask import Flask, request, render_template, Response, stream_with_context, jsonify, make_response, redirect, url_for
 import numpy as np
 import tensorflow as tf
 import app.fng_model as fng_model
@@ -380,8 +380,9 @@ def stream_progress():
 
 @app.route('/generate', methods=['POST'])
 def generate():
-    # This is now just a template rendering route, actual processing happens in stream_progress
-    return render_template('index.html')
+    # Use Post/Redirect/Get pattern to avoid browser "resubmit the form" on refresh.
+    # The actual processing happens in /stream_progress.
+    return redirect(url_for('home'))
 
 
 @app.route('/train', methods=['POST'])
