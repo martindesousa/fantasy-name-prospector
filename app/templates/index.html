@@ -124,8 +124,11 @@
                                 
                                 <div class="mb-3">
                                     <label for="new-model-description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
-                                    <textarea id="new-model-description" name="new-model-description" rows="2" maxlength="150" class="form-control" 
-                                              placeholder="Brief description of your model (max 150 chars)..."></textarea>
+                                    <div class="textarea-resize-wrapper" style="position:relative;">
+                                        <textarea id="new-model-description" name="new-model-description" rows="2" maxlength="150" class="form-control" 
+                                                  placeholder="Brief description of your model (max 150 chars)..."></textarea>
+                                        <div id="desc-resize-handle" class="resize-handle" title="Drag to resize" aria-hidden="true"></div>
+                                    </div>
                                 </div>
                                 
                                 <div class="mb-3">

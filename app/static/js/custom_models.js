@@ -86,34 +86,47 @@ function setupEventListeners() {
     }
 }
 
-// Live line count and custom resize for training textarea
-function initCustomNamesEnhancements() {
-    const textarea = document.getElementById('custom-names-input');
-    const countBadge = document.getElementById('custom-names-count');
-    const handle = document.getElementById('custom-resize-handle');
+// Initialize description and training names resizers and training names count badge
+function initResizableTextarea(textareaId, handleId, countBadgeId) {
+    const textarea = document.getElementById(textareaId);
+    const handle = handleId ? document.getElementById(handleId) : null;
+    const countBadge = countBadgeId ? document.getElementById(countBadgeId) : null;
 
-    if (!textarea) return;
+    if (!textarea) return null;
 
+    // Optional count updater (exposed for the custom-names textarea)
     function updateCount() {
+        if (!countBadge) return;
         const lines = textarea.value.split('\n').filter(l => l.trim());
         const n = lines.length;
-        if (countBadge) countBadge.textContent = `${n} ${n === 1 ? 'name' : 'names'}`;
+        countBadge.textContent = `${n} ${n === 1 ? 'name' : 'names'}`;
     }
-    window.updateCustomNamesCount = updateCount;
 
-    // Initial count
-    updateCount();
+    // Expose update function for the training names textarea specifically
+    if (countBadgeId === 'custom-names-count') {
+        window.updateCustomNamesCount = updateCount;
+    }
 
-    // Update on input (typing, paste)
-    textarea.addEventListener('input', updateCount);
+    // Initial count update if applicable
+    try { updateCount(); } catch (e) {}
 
-    // Also update when other code modifies the textarea
-    const observer = new MutationObserver(updateCount);
-    observer.observe(textarea, { characterData: true, childList: true, subtree: true });
+    // Update on input events
+    textarea.addEventListener('input', function() {
+        try { updateCount(); } catch (e) {}
+    });
 
-    // Implement smooth drag-to-resize using the custom handle
-    if (!handle) return;
+    // Watch for DOM changes that may update the textarea content programmatically
+    try {
+        const observer = new MutationObserver(function() { try { updateCount(); } catch (e) {} });
+        observer.observe(textarea, { characterData: true, childList: true, subtree: true });
+    } catch (e) {
+        // MutationObserver might not be available - non-fatal
+    }
 
+    // If there's no handle supplied, we're done (count-only)
+    if (!handle) return { updateCount };
+
+    // Pointer-based smooth drag-to-resize
     let startY = 0;
     let startHeight = 0;
     let dragging = false;
@@ -143,29 +156,38 @@ function initCustomNamesEnhancements() {
         handle.classList.remove('active');
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
-        updateCount();
+        try { updateCount(); } catch (e) {}
     };
 
     handle.addEventListener('pointerdown', onPointerDown, { passive: false });
 
-    // Keyboard accessibility: allow +/- keys on handle to increase/decrease height
+    // Keyboard accessibility for the handle
     handle.tabIndex = 0;
     handle.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowUp' || e.key === 'PageUp') {
             textarea.style.height = (textarea.clientHeight - 20) + 'px';
             e.preventDefault();
-            updateCount();
+            try { updateCount(); } catch (err) {}
         } else if (e.key === 'ArrowDown' || e.key === 'PageDown') {
             textarea.style.height = (textarea.clientHeight + 20) + 'px';
             e.preventDefault();
-            updateCount();
+            try { updateCount(); } catch (err) {}
         }
     });
+
+    return { updateCount };
 }
 
-// Initialize enhancements when DOM ready
+// Initialize enhancements when DOM ready: wire both textareas to the shared initializer
 document.addEventListener('DOMContentLoaded', function() {
-    try { initCustomNamesEnhancements(); } catch (e) { console.warn('Custom names enhancements failed', e); }
+    try {
+        // Training names textarea with count badge
+        initResizableTextarea('custom-names-input', 'custom-resize-handle', 'custom-names-count');
+        // Description textarea (no count badge)
+        initResizableTextarea('new-model-description', 'desc-resize-handle', null);
+    } catch (e) {
+        console.warn('Resizable textarea initialization failed', e);
+    }
 });
 
 // Function to set the new-model form header text based on if editing or not

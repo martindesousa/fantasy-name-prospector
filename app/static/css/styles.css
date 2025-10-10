@@ -598,3 +598,12 @@ body {
     transition: height 180ms cubic-bezier(.2,.8,.2,1);
     resize: vertical; 
 }
+
+/* Description-specific handle alignment (matches training textarea) */
+#desc-resize-handle {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 18px;
+    height: 18px;
+}
