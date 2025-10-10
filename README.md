@@ -30,14 +30,18 @@ The website currently has these pretrained models that can be used to generate n
 * Arabic
 * Aztec
 * Spanish
+* Japanese 
+* Tamil
 
 These models are not currently available but are high priority:
-* Roman
-* Japanese 
-* Thai
 * English
+* Roman
+* Thai
 * Hawaiian
 
 ### How it Works 
 The language patterns are learned by an LSTM-based model that is trained to learn bidirectional patterns and bigram commonality. After this, the model knows which characters to pick based on a sub-portion of a generated name. 
 Name generation is tinkered by many generation parameters, many of which the user controls, such as Gender, Temperature, Prefix, and Length. There are also other parameters controlling penalties on ending trigrams, hyphens, and capital letters. 
+
+### Sources:
+Names in the text files including French, Greek, Russian, Arabic, Aztec, Spanish, and Japanese are sourced from BabyNames.com, with each respective page being found at https://babynames.com/{language}-baby-names.

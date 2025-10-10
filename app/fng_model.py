@@ -5,7 +5,6 @@ import keras
 import json
 from collections import Counter
 import tempfile
-from app.storage import save_model_to_s3, get_user_id
 
 # HELPER METHODS FOR load_data #############################################################################
 def load_names(input_text=None, input_file=None):
@@ -238,6 +237,7 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_coun
 
     # Custom: only upload to S3
     with tempfile.TemporaryDirectory() as tmpdir:
+        from app.storage import save_model_to_s3, get_user_id
         keras_path = os.path.join(tmpdir, model_name + '.keras')
         json_path = os.path.join(tmpdir, model_name + '.json')
 
