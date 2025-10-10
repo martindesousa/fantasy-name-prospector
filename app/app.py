@@ -97,54 +97,23 @@ def api_list_custom_models():
         cookie_resp = None
 
     models = []
-    s3 = storage.s3
-    bucket = storage.BUCKET
-    if s3 is None:
-        return jsonify({'models': []})
-
-    prefix = f"{user_id}/" if user_id else ''
     try:
-        resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        for obj in resp.get('Contents', []):
-            key = obj['Key']
-            # Only consider explicit metadata files (created by the metadata API). Skip internal model json blobs.
-            if not key.endswith('.meta.json'):
-                continue
-            try:
-                body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
-                meta = json.loads(body)
-            except Exception:
-                # fallback: create simple metadata from key
-                base = os.path.basename(key)
-                # strip .meta.json suffix
-                model_id = base[:-len('.meta.json')] if base.endswith('.meta.json') else os.path.splitext(base)[0]
-                meta = {'id': model_id, 'name': model_id, 'createdAt': obj.get('LastModified').isoformat()}
-
-            # Sanitize metadata for frontend: ensure id and name exist and are sensible
+        models = storage.list_user_models(user_id)
+        # strip heavy trainingData fields and normalize timestamps
+        stripped = []
+        for meta in models:
             if not isinstance(meta, dict):
                 continue
-
-            # Derive model_id if missing
-            model_id = meta.get('id') or (os.path.basename(key)[:-len('.meta.json')] if key.endswith('.meta.json') else os.path.splitext(os.path.basename(key))[0])
-            meta['id'] = model_id
-
-            # If name is missing, empty, null, or the string 'undefined', fallback to id
-            name_val = meta.get('name')
-            if name_val is None or name_val == '' or (isinstance(name_val, str) and name_val.lower() == 'undefined'):
-                meta['name'] = model_id
-
-            # Normalize createdAt if present (keep as timestamp or ISO string)
-            if 'createdAt' not in meta or not meta.get('createdAt'):
-                meta['createdAt'] = obj.get('LastModified').isoformat() if obj.get('LastModified') else int(time.time() * 1000)
-
-            # Do not send full training data in the list response to avoid large payloads
-            if 'trainingData' in meta:
+            m = dict(meta)
+            if 'trainingData' in m:
                 try:
-                    del meta['trainingData']
+                    del m['trainingData']
                 except Exception:
-                    meta['trainingData'] = None
-
-            models.append(meta)
+                    m['trainingData'] = None
+            if 'createdAt' not in m or not m.get('createdAt'):
+                m['createdAt'] = int(time.time() * 1000)
+            stripped.append(m)
+        models = stripped
     except Exception as e:
         print('Error listing models from S3:', e)
 
@@ -164,16 +133,9 @@ def api_get_custom_model(model_id):
         user_id = request.cookies.get('user_id') or None
         cookie_resp = None
 
-    s3 = storage.s3
-    bucket = storage.BUCKET
-    if s3 is None:
-        return jsonify({'error': 'S3 not configured'}), 500
-
-    key = f"{user_id}/{model_id}.meta.json"
     try:
-        body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
-        meta = json.loads(body)
-    except Exception as e:
+        meta = storage.get_model_metadata_from_s3(user_id, model_id)
+    except Exception:
         return jsonify({'error': 'Model not found'}), 404
 
     # Ensure id and reasonable fields
@@ -217,14 +179,8 @@ def api_create_custom_model():
     # include trainingData for now (optional)
     meta['trainingData'] = training_data
 
-    s3 = storage.s3
-    bucket = storage.BUCKET
-    if s3 is None:
-        return jsonify({'error': 'S3 not configured'}), 500
-
-    key = f"{user_id}/{model_id}.meta.json"
     try:
-        s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(meta).encode('utf-8'))
+        storage.save_model_metadata_to_s3(user_id, model_id, meta)
     except Exception as e:
         print('Error saving metadata to S3:', e)
         return jsonify({'error': 'Save failed'}), 500
@@ -238,40 +194,11 @@ def api_create_custom_model():
 @app.route('/api/custom_models/<model_id>', methods=['DELETE'])
 def api_delete_custom_model(model_id):
     user_id, cookie_resp = storage.get_user_id()
-    s3 = storage.s3
-    bucket = storage.BUCKET
-    if s3 is None:
-        return jsonify({'error': 'S3 not configured'}), 500
-
-    # delete related top-level keys if present (legacy pattern)
-    top_level_keys = [f"{user_id}/{model_id}.meta.json", f"{user_id}/{model_id}.json", f"{user_id}/{model_id}.keras"]
-    for key in top_level_keys:
-        try:
-            s3.delete_object(Bucket=bucket, Key=key)
-        except Exception as e:
-            try:
-                print(f"Error deleting top-level S3 key {key}: {e}")
-            except Exception:
-                pass
-
-    # Also delete any objects under the model prefix (newer save path user_id/model_id/...)
-    prefix = f"{user_id}/{model_id}/"
     try:
-        resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        contents = resp.get('Contents', []) if resp else []
-        if contents:
-            # Build delete list
-            delete_objs = [{'Key': obj['Key']} for obj in contents]
-            try:
-                s3.delete_objects(Bucket=bucket, Delete={'Objects': delete_objs})
-            except Exception as e:
-                try:
-                    print(f"Error deleting objects under prefix {prefix}: {e}")
-                except Exception:
-                    pass
+        storage.delete_model_from_s3(user_id, model_id)
     except Exception as e:
         try:
-            print(f"Error listing objects for prefix {prefix}: {e}")
+            print(f"Error deleting model {model_id}: {e}")
         except Exception:
             pass
 
@@ -295,19 +222,14 @@ def api_update_custom_model(model_id):
         user_id = request.cookies.get('user_id') or None
         cookie_resp = None
 
-    s3 = storage.s3
-    bucket = storage.BUCKET
-    if s3 is None:
-        return jsonify({'error': 'S3 not configured'}), 500
-
-    key = f"{user_id}/{model_id}.meta.json"
     try:
-        # Fetch existing metadata if present
+        # Read existing metadata if present
         try:
-            body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
-            meta = json.loads(body)
+            existing_meta = storage.get_model_metadata_from_s3(user_id, model_id)
         except Exception:
-            meta = {}
+            existing_meta = {}
+
+        meta = existing_meta or {}
 
         # Update fields (only when provided)
         if name is not None:
@@ -320,12 +242,13 @@ def api_update_custom_model(model_id):
             meta['trainingData'] = training_data
             meta['nameCount'] = len([l for l in training_data.splitlines() if l.strip()])
 
-        # Update lastUsed timestamp
+        # Update timestamps
         meta['lastUsed'] = int(time.time() * 1000)
         if 'createdAt' not in meta:
             meta['createdAt'] = int(time.time() * 1000)
 
-        s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(meta).encode('utf-8'))
+        # Persist via storage helper which writes to {user_id}/{model_id}/meta.json
+        storage.save_model_metadata(user_id, model_id, meta)
     except Exception as e:
         print('Error updating metadata to S3:', e)
         return jsonify({'error': 'Update failed'}), 500
@@ -381,12 +304,8 @@ def stream_progress():
                     model_name = selected_custom
                     # Load the training data from metadata if available (best-effort)
                     try:
-                        s3 = storage.s3
-                        bucket = storage.BUCKET
-                        key = f"{user_id}/{model_name}.meta.json" if user_id else None
-                        if key:
-                            body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
-                            meta = json.loads(body)
+                        if user_id:
+                            meta = storage.get_model_metadata_from_s3(user_id, model_name)
                             raw_custom = meta.get('trainingData', '')
                             custom_names = raw_custom.splitlines()
                         else:
@@ -404,11 +323,7 @@ def stream_progress():
                 # Get training names by loading metadata from S3; do so if we have user_id
                 if user_id:
                     try:
-                        s3 = storage.s3
-                        bucket = storage.BUCKET
-                        key = f"{user_id}/{model_name}.meta.json"
-                        body = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
-                        meta = json.loads(body)
+                        meta = storage.get_model_metadata_from_s3(user_id, model_name)
                         raw_custom = meta.get('trainingData', '')
                         custom_names = raw_custom.splitlines()
                     except Exception:
