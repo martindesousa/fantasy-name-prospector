@@ -37,11 +37,38 @@ document.querySelector('.container-fluid').addEventListener('click', function(e)
             setTimeout(() => {
                 nameItem.style.backgroundColor = originalBg;
             }, 200);
+            // show transient copied notification
+            showCopiedToast('Copied to clipboard');
         }).catch(err => {
             console.warn('Failed to copy to clipboard:', err);
         });
     }
 });
+
+// Show toast notification for copying names
+function showCopiedToast(message, timeout=1400) {
+    try {
+        const existing = document.getElementById('copied-toast');
+        if (existing) existing.remove();
+
+        const t = document.createElement('div');
+        t.id = 'copied-toast';
+        t.className = 'copied-toast';
+        t.textContent = message;
+        document.body.appendChild(t);
+        // Trigger reflow to enable CSS transition
+        void t.offsetWidth;
+        t.classList.add('show');
+
+        setTimeout(() => {
+            t.classList.remove('show');
+            setTimeout(() => { try { t.remove(); } catch(e){} }, 220);
+        }, timeout);
+    } catch (e) {
+        // Notification does not need to break anything
+        console.warn('Toast failed', e);
+    }
+}
 
 // Create a fresh spinner element (so we can restore it after showing the warning image)
 function createSpinner() {

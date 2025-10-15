@@ -399,6 +399,28 @@ body {
     border-left: 3px solid var(--accent-color);
 }
 
+/* Copied-to-clipboard toast */
+.copied-toast {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    padding: 10px 14px;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    z-index: 9999;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 180ms ease-in-out, transform 180ms ease-in-out;
+}
+.copied-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 .custom-model-item:last-child {
     border-bottom: none;
 }
