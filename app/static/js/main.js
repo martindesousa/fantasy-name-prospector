@@ -6,6 +6,8 @@ const prefixInput = document.getElementById('prefix');
 const lengthInput = document.getElementById('length');
 const lengthModeSelect = document.getElementById('length_mode');
 const errorMessage = document.getElementById('error-message');
+// preserve default error HTML so we can restore it after custom validation messages
+const defaultErrorHTML = errorMessage ? errorMessage.innerHTML : '';
 
 // References to loading elements
 const loadingDiv = document.getElementById('loading');
@@ -102,6 +104,9 @@ if (lengthModeSelect) {
             lengthInput.placeholder = 'automatic';
             lengthInput.disabled = true;
             lengthInput.removeAttribute('name');
+            // remove numeric constraints when not numeric
+            lengthInput.removeAttribute('min');
+            lengthInput.removeAttribute('max');
         } else if (mode === 'average') {
             lengthInput.type = 'text';
             lengthInput.value = '';
@@ -128,10 +133,12 @@ if (lengthModeSelect) {
         } else if (mode === 'custom') {
             lengthInput.type = 'number';
             lengthInput.value = '';
-            lengthInput.placeholder = 'Enter length';
+            lengthInput.placeholder = '0 - 20';
             lengthInput.disabled = false;
             lengthInput.name = 'length';
+            // enforce reasonable bounds for custom length
             lengthInput.min = 1;
+            lengthInput.max = 20;
         }
     });
 
@@ -180,6 +187,19 @@ form.addEventListener('submit', function(event) {
         errorMessage.style.display = 'none';
         prefixInput.classList.remove('input-error');
         lengthInput.classList.remove('input-error');
+    }
+
+    // Additional validation: enforce maximum allowed custom length
+    if (lengthMode === 'custom' && Number.isFinite(nameLength)) {
+        if (nameLength > 20) {
+            errorMessage.style.display = 'block';
+            errorMessage.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Error: Maximum allowed length is 20.';
+            lengthInput.classList.add('input-error');
+            return;
+        } else {
+            // restore default message if previously modified
+            if (errorMessage && defaultErrorHTML) errorMessage.innerHTML = defaultErrorHTML;
+        }
     }
 
     // Set generation state and disable generate button
