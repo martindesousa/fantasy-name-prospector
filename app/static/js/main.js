@@ -197,11 +197,10 @@ form.addEventListener('submit', function(event) {
     // ensure spinner visible (in case previous action showed the warning image)
     restoreSpinner();
 
-    const existingResults = document.querySelector('.results-section');
-    if (existingResults) existingResults.remove();
-    // Remove any leftover spacer from previous runs
-    const prevSpacer = document.getElementById('results-spacer');
-    if (prevSpacer) prevSpacer.remove();
+    // Clear previous results using the centralized results module
+    if (typeof results !== 'undefined' && results.clear) {
+        try { results.clear(); } catch (e) { console.warn('results.clear failed', e); }
+    }
 
     const formData = new FormData(form);
 
@@ -254,60 +253,13 @@ form.addEventListener('submit', function(event) {
                                     loadingDiv.style.display = 'block';
                                     restoreSpinner();
 
-                                    let resultsContainer = document.querySelector('.results-section');
-                                    if (!resultsContainer) {
-                                        resultsContainer = document.createElement('div');
-                                        resultsContainer.className = 'main-container results-section';
-                                        resultsContainer.innerHTML = `
-                                            <div class="results-header">
-                                                <h3>Generated Names</h3>
-                                                <span class="badge bg-primary" id="name-count">0 names</span>
-                                            </div>
-                                            <div class="name-grid" id="generated-name-grid">
-                                            </div>
-                                        `;
-                                        document.querySelector('.container-fluid').appendChild(resultsContainer);
-                                        // Insert a temporary spacer at the end of the document so scrollIntoView lands the
-                                        // results container more centrally even if it expands after being shown.
-                                        try {
-                                            let spacer = document.getElementById('results-spacer');
-                                            if (!spacer) {
-                                                spacer = document.createElement('div');
-                                                spacer.id = 'results-spacer';
-                                                // tune height as needed
-                                                spacer.style.height = '240px';
-                                                spacer.style.pointerEvents = 'none';
-                                                document.body.appendChild(spacer);
-                                            }
-
-                                            // Here, scroll the results into view
-                                            resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                                            const previousTransition = resultsContainer.style.transition;
-                                            resultsContainer.style.transition = 'box-shadow 220ms ease-in-out';
-                                            resultsContainer.style.boxShadow = '0 0 0 4px rgba(23, 109, 201, 1)';
-                                            setTimeout(() => {
-                                                resultsContainer.style.boxShadow = '0 0 0 0 rgba(0,0,0,0)';
-                                                setTimeout(() => { resultsContainer.style.transition = previousTransition; }, 240);
-                                            }, 360);
-                                        } catch (e) {
-                                            console.warn('Scroll/flash for results failed', e);
-                                        }
-                                    }
-
                                     if (jsonData.name) {
-                                        const nameGrid = document.getElementById('generated-name-grid');
-                                        const nameItem = document.createElement('div');
-                                        nameItem.className = 'name-item';
-                                        nameItem.textContent = jsonData.name;
-
-                                        // No individual click listener needed - handled by event delegation above
-                                        nameGrid.appendChild(nameItem);
-
-                                        const countBadge = document.getElementById('name-count');
-                                        if (countBadge) {
-                                            const currentCount = nameGrid.children.length;
-                                            countBadge.textContent = `${currentCount} names`;
+                                        try {
+                                            if (typeof results !== 'undefined' && results.addName) {
+                                                results.addName(jsonData.name);
+                                            }
+                                        } catch (e) {
+                                            console.warn('results.addName failed', e);
                                         }
                                     }
                                     break;
@@ -328,20 +280,14 @@ form.addEventListener('submit', function(event) {
                                     const spacerFinal = document.getElementById('results-spacer');
                                     if (spacerFinal) spacerFinal.remove();
 
-                                    let finalResultsContainer = document.querySelector('.results-section');
-                                    if (!finalResultsContainer) {
-                                        finalResultsContainer = document.createElement('div');
-                                        finalResultsContainer.className = 'main-container results-section';
-                                        finalResultsContainer.innerHTML = `
-                                            <div class="results-header">
-                                                <h3>Generated Names</h3>
-                                                <span class="badge bg-primary">${jsonData.names.length} names</span>
-                                            </div>
-                                            <div class="name-grid">
-                                                ${jsonData.names.map(name => `<div class="name-item" onclick="navigator.clipboard.writeText('${name}')">${name}</div>`).join('')}
-                                            </div>
-                                        `;
-                                        document.querySelector('.container-fluid').appendChild(finalResultsContainer);
+                                    if (jsonData.names && Array.isArray(jsonData.names)) {
+                                        try {
+                                            if (typeof results !== 'undefined' && results.renderFinal) {
+                                                results.renderFinal(jsonData.names);
+                                            }
+                                        } catch (e) {
+                                            console.warn('results.renderFinal failed', e);
+                                        }
                                     }
                                     break;
 
