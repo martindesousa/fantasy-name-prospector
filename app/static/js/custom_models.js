@@ -46,6 +46,14 @@ try {
     // non-critical
 }
 
+// Called when a custom model is used to generate names (to update its lastUsed timestamp)
+function markModelUsed(modelId) {
+    const model = customModels.find(m => m.id === modelId);
+    if (!model) return;
+    model.lastUsed = Date.now();
+    renderModelsList();
+}
+
 // Initialize the interface
 document.addEventListener('DOMContentLoaded', function() {
     // If an initializeInterface function exists in another script, it will run there.
@@ -364,9 +372,6 @@ function selectModel(modelId) {
     } catch (e) {
         console.warn('Could not ensure model-hidden input:', e);
     }
-
-    // Update last used
-    model.lastUsed = Date.now();
 
     // Re-render to update selection highlight
     renderModelsList();

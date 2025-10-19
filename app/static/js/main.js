@@ -217,6 +217,16 @@ form.addEventListener('submit', function(event) {
     // ensure spinner visible (in case previous action showed the warning image)
     restoreSpinner();
 
+    // If using a custom model, mark it as used now (so it moves to top only when actually used)
+    try {
+        const modelType = document.getElementById('model-type') ? document.getElementById('model-type').value : null;
+        const selectedHidden = document.getElementById('selected-custom-model');
+        const selId = selectedHidden ? selectedHidden.value : null;
+        if (modelType === 'custom' && selId && typeof markModelUsed === 'function') {
+            try { markModelUsed(selId); } catch(e) { console.warn('markModelUsed failed', e); }
+        }
+    } catch(e) {}
+
     // Clear previous results using the centralized results module
     if (typeof results !== 'undefined' && results.clear) {
         try { results.clear(); } catch (e) { console.warn('results.clear failed', e); }
