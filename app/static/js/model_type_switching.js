@@ -63,6 +63,12 @@
                 }
 
             } else {
+                // Switching to template tab - clear any custom model status messages
+                const statusContainer = document.getElementById('status-messages');
+                if (statusContainer) {
+                    statusContainer.innerHTML = '';
+                }
+                
                 // restore template model
                 const hidden = document.getElementById('model-hidden');
                 if (hidden) {

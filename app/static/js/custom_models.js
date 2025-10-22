@@ -1,36 +1,5 @@
 // custom_models.js
 
-// MOCK DATA
-let customModels = [
-    {
-        id: 'fantasy_heroes_001',
-        name: 'Fantasy Heroes',
-        description: 'Epic fantasy character names',
-        category: 'fantasy',
-        nameCount: 45,
-        createdAt: new Date('2024-01-15').getTime(),
-        lastUsed: new Date('2024-01-20').getTime()
-    },
-    {
-        id: 'sci_fi_pilots_002',
-        name: 'Sci-Fi Pilots',
-        description: 'Futuristic pilot names',
-        category: 'sci-fi',
-        nameCount: 32,
-        createdAt: new Date('2024-01-10').getTime(),
-        lastUsed: new Date('2024-01-18').getTime()
-    },
-    {
-        id: 'royal_names_003',
-        name: 'Royal Names',
-        description: 'Noble and royal names',
-        category: 'historical',
-        nameCount: 28,
-        createdAt: new Date('2024-01-05').getTime(),
-        lastUsed: new Date('2024-01-16').getTime()
-    }
-];
-
 let selectedModelId = null;
 let editingModelId = null; // when editing an existing model, this holds its id
 let originalTrainingData = null;
@@ -63,6 +32,17 @@ function resetTrainingState() {
     isTraining = false;
     const cancelBtn = document.getElementById('cancel-training-button');
     if (cancelBtn) cancelBtn.style.display = 'none';
+    
+    // Clear status messages when canceling training
+    clearStatusMessages();
+}
+
+// Clear all status messages
+function clearStatusMessages() {
+    const statusContainer = document.getElementById('status-messages');
+    if (statusContainer) {
+        statusContainer.innerHTML = '';
+    }
 }
 
 // Initialize the interface
