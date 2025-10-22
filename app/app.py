@@ -458,7 +458,7 @@ def train():
 
         model = fng_model.create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts)
 
-        epochs = 15
+        epochs = 50
         yield f"data: {json.dumps({'type': 'training', 'message': 'Starting training...', 'progress': 10})}\n\n"
 
         # Use a per-request progress queue

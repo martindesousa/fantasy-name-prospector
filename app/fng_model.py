@@ -195,8 +195,8 @@ def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None, can
         restore_best_weights=True
     )
 
-    # callbacks = [early_stopping] # Use if want early_stopping
-    callbacks = [] # Use if don't want early_stopping
+    callbacks = [early_stopping] # Use if want early_stopping
+    # callbacks = [] # Use if don't want early_stopping
     if stream_progress:
         callbacks.append(TrainingProgressCallback(total_epochs=epochs, stream_progress=stream_progress, cancel_event=cancel_event))
     
