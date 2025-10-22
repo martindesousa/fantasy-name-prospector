@@ -7,6 +7,7 @@ let originalTrainingData = null;
 // Track training state
 let isTraining = false;
 let trainingAbortController = null;
+let currentTrainingSessionId = null;
 
 // If the server (or previous client state) stored a selected model id in the hidden
 // field, initialize our in-memory selection so loadCustomModels can reapply it.
@@ -30,6 +31,7 @@ function markModelUsed(modelId) {
 // Reset training state and hide cancel button
 function resetTrainingState() {
     isTraining = false;
+    currentTrainingSessionId = null;
     const cancelBtn = document.getElementById('cancel-training-button');
     if (cancelBtn) cancelBtn.style.display = 'none';
     
@@ -73,8 +75,23 @@ function setupEventListeners() {
     const cancelTrainingBtn = document.getElementById('cancel-training-button');
     if (cancelTrainingBtn) {
         cancelTrainingBtn.addEventListener('click', function() {
-            if (trainingAbortController) {
+            if (trainingAbortController && currentTrainingSessionId) {
+                // Call the backend to cancel the training thread
+                fetch('/cancel_training', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentTrainingSessionId })
+                }).then(response => response.json())
+                  .then(data => {
+                      console.log('Training cancellation response:', data);
+                  })
+                  .catch(err => {
+                      console.error('Failed to cancel training on server:', err);
+                  });
+                
+                // Abort the fetch to stop receiving updates
                 trainingAbortController.abort();
+                
                 if (typeof loadingText !== 'undefined' && loadingText) {
                     loadingText.textContent = 'Training cancelled';
                 }
@@ -508,6 +525,11 @@ function startTraining(payload) {
                         if (jsonData.progress !== undefined && typeof progressBar !== 'undefined') {
                             progressBar.style.width = jsonData.progress + '%';
                         }
+                        
+                        // Capture session_id to prepare for cancellation
+                        if (jsonData.session_id) {
+                            currentTrainingSessionId = jsonData.session_id;
+                        }
 
                         switch (jsonData.type) {
                             case 'preparing':
@@ -529,6 +551,18 @@ function startTraining(payload) {
                                         loadingDiv.style.display = 'none';
                                     }
                                 }, 2000);
+                                break;
+                            case 'cancelled':
+                                // Training was cancelled
+                                if (typeof showWarningImage === 'function') showWarningImage();
+                                showStatusMessage('Training cancelled by user', 'error');
+                                resetTrainingState();
+                                // Hide loading after showing message
+                                setTimeout(() => {
+                                    if (typeof loadingDiv !== 'undefined' && loadingDiv) {
+                                        loadingDiv.style.display = 'none';
+                                    }
+                                }, 1500);
                                 break;
                             case 'complete':
                                 // training finished; backend should include model_id

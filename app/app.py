@@ -21,6 +21,10 @@ application = app
 # Shared queue for progress updates
 progress_queue = queue.Queue()
 
+# Track active training sessions for cancellation
+active_training_sessions = {}
+training_sessions_lock = threading.Lock()
+
 # Function to generate a name
 def generate_name(model, prefix_text, length=6, temperature=1.0):
     return fng_name_generate.generate_name(model, prefix_text, length, temperature)
@@ -385,6 +389,27 @@ def generate():
     return redirect(url_for('home'))
 
 
+@app.route('/cancel_training', methods=['POST'])
+def cancel_training():
+    """Cancel an active training session."""
+    try:
+        payload = request.get_json()
+        session_id = payload.get('session_id')
+        
+        if not session_id:
+            return jsonify({'success': False, 'error': 'No session_id provided'}), 400
+        
+        with training_sessions_lock:
+            if session_id in active_training_sessions:
+                cancel_event = active_training_sessions[session_id]
+                cancel_event.set()  # Signal the training thread to stop
+                return jsonify({'success': True, 'message': 'Training cancellation requested'})
+            else:
+                return jsonify({'success': False, 'error': 'Training session not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/train', methods=['POST'])
 def train():
     """Train a custom model from submitted names and stream progress via SSE."""
@@ -410,9 +435,17 @@ def train():
         # compute deterministic id
         model_hash = hashlib.md5("\n".join(names).encode('utf-8')).hexdigest()
         model_id = f"custom_{model_hash}"
+        
+        # Create a unique session ID for this training request
+        session_id = f"training_{model_id}_{int(time.time() * 1000)}"
+        cancel_event = threading.Event()
+        
+        # Register this training session
+        with training_sessions_lock:
+            active_training_sessions[session_id] = cancel_event
 
-        # Inform client
-        yield f"data: {json.dumps({'type': 'preparing', 'message': 'Preparing training...', 'progress': 0})}\n\n"
+        # Inform client of session ID
+        yield f"data: {json.dumps({'type': 'preparing', 'message': 'Preparing training...', 'progress': 0, 'session_id': session_id})}\n\n"
 
         # Prepare training data
         yield f"data: {json.dumps({'type': 'loading', 'message': 'Processing training data...', 'progress': 5})}\n\n"
@@ -441,7 +474,11 @@ def train():
 
         def train_thread():
             try:
-                fng_model.train_model(X, y, model, epochs=epochs, batch_size=64, stream_progress=local_progress_callback)
+                fng_model.train_model(X, y, model, epochs=epochs, batch_size=64, stream_progress=local_progress_callback, cancel_event=cancel_event)
+                # Check if training was cancelled
+                if cancel_event.is_set():
+                    local_queue.put({'cancelled': True})
+                    return
                 # Save to S3 via helper — provide user_id captured above
                 fng_model.save_model_data(
                     model, 
@@ -479,10 +516,20 @@ def train():
             try:
                 update = local_queue.get(timeout=0.5)
                 if 'error' in update:
+                    with training_sessions_lock:
+                        active_training_sessions.pop(session_id, None)
                     yield f"data: {json.dumps({'type': 'error', 'message': 'Training failed: '+update['error'], 'progress': 0})}\n\n"
+                    return
+                if update.get('cancelled'):
+                    training_complete = True
+                    with training_sessions_lock:
+                        active_training_sessions.pop(session_id, None)
+                    yield f"data: {json.dumps({'type': 'cancelled', 'message': 'Training cancelled', 'progress': 0})}\n\n"
                     return
                 if update.get('complete'):
                     training_complete = True
+                    with training_sessions_lock:
+                        active_training_sessions.pop(session_id, None)
                     yield f"data: {json.dumps({'type': 'training', 'message': 'Training complete', 'progress': 100})}\n\n"
                     break
                 # normal epoch update
@@ -494,6 +541,13 @@ def train():
                 progress = int((current / total) * 100) if total else 0
                 yield f"data: {json.dumps({'type': 'training', 'message': f'Epoch {current}/{total}', 'progress': progress})}\n\n"
             except queue.Empty:
+                # Check if training was cancelled while we were waiting
+                if cancel_event.is_set():
+                    training_complete = True
+                    with training_sessions_lock:
+                        active_training_sessions.pop(session_id, None)
+                    yield f"data: {json.dumps({'type': 'cancelled', 'message': 'Training cancelled', 'progress': 0})}\n\n"
+                    return
                 # Queue was empty; report a heartbeat but include last known epoch/total if available
                 try:
                     heartbeat_msg = f"Training in progress: Epoch {last_epoch}/{last_total}" if last_total else "Training in progress"

@@ -188,7 +188,7 @@ def create_model(X, char_to_idx, idx_to_char, char_set, bigram_counts):
     return model
 
 # Train the model with early stopping to prevent overfitting
-def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None):
+def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None, cancel_event=None):
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss',
         patience=5,
@@ -198,7 +198,7 @@ def train_model(X, y, model, epochs=50, batch_size=64, stream_progress=None):
     # callbacks = [early_stopping] # Use if want early_stopping
     callbacks = [] # Use if don't want early_stopping
     if stream_progress:
-        callbacks.append(TrainingProgressCallback(total_epochs=epochs, stream_progress=stream_progress))
+        callbacks.append(TrainingProgressCallback(total_epochs=epochs, stream_progress=stream_progress, cancel_event=cancel_event))
     
     model.fit(
         X, y, 
@@ -271,13 +271,19 @@ def save_model_data(model, X, y, char_to_idx, idx_to_char, char_set, bigram_coun
             raise
 
 class TrainingProgressCallback(tf.keras.callbacks.Callback):
-    def __init__(self, total_epochs, stream_progress):
+    def __init__(self, total_epochs, stream_progress, cancel_event=None):
         super().__init__()
         self.total_epochs = total_epochs
         self.stream_progress = stream_progress
+        self.cancel_event = cancel_event
         self.epochs_completed = []  # Store completed epochs
 
     def on_epoch_end(self, epoch, logs=None):
+        # Check if cancellation was requested
+        if self.cancel_event and self.cancel_event.is_set():
+            self.model.stop_training = True
+            return
+        
         # Current epoch (1-based)
         current_epoch = epoch + 1
         # Add to completed epochs
