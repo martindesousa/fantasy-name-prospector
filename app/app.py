@@ -248,7 +248,7 @@ def api_update_custom_model(model_id):
             meta['createdAt'] = int(time.time() * 1000)
 
         # Persist via storage helper which writes to {user_id}/{model_id}/meta.json
-        storage.save_model_metadata(user_id, model_id, meta)
+        storage.save_model_metadata_to_s3(user_id, model_id, meta)
     except Exception as e:
         print('Error updating metadata to S3:', e)
         return jsonify({'error': 'Update failed'}), 500

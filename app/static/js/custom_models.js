@@ -35,6 +35,10 @@ let selectedModelId = null;
 let editingModelId = null; // when editing an existing model, this holds its id
 let originalTrainingData = null;
 
+// Track training state
+let isTraining = false;
+let trainingAbortController = null;
+
 // If the server (or previous client state) stored a selected model id in the hidden
 // field, initialize our in-memory selection so loadCustomModels can reapply it.
 try {
@@ -52,6 +56,13 @@ function markModelUsed(modelId) {
     if (!model) return;
     model.lastUsed = Date.now();
     renderModelsList();
+}
+
+// Reset training state and hide cancel button
+function resetTrainingState() {
+    isTraining = false;
+    const cancelBtn = document.getElementById('cancel-training-button');
+    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 // Initialize the interface
@@ -78,6 +89,29 @@ function setupEventListeners() {
 
     const cancelBtn = document.getElementById('cancel-new-model');
     if (cancelBtn) cancelBtn.addEventListener('click', hideNewModelForm);
+
+    const cancelTrainingBtn = document.getElementById('cancel-training-button');
+    if (cancelTrainingBtn) {
+        cancelTrainingBtn.addEventListener('click', function() {
+            if (trainingAbortController) {
+                trainingAbortController.abort();
+                if (typeof loadingText !== 'undefined' && loadingText) {
+                    loadingText.textContent = 'Training cancelled';
+                }
+                if (typeof showWarningImage === 'function') {
+                    showWarningImage();
+                }
+                
+                // Hide cancel button and loading after a brief delay
+                setTimeout(() => {
+                    if (typeof loadingDiv !== 'undefined' && loadingDiv) {
+                        loadingDiv.style.display = 'none';
+                    }
+                    resetTrainingState();
+                }, 1500);
+            }
+        });
+    }
 
     const form = document.getElementById('name-generator-form');
     if (form) {
@@ -442,16 +476,35 @@ function clearNewModelForm() {
 
 // Start training by POSTing to /train and streaming SSE updates
 function startTraining(payload) {
+    // Prevent multiple simultaneous trainings
+    if (isTraining) {
+        return;
+    }
+
+    isTraining = true;
+    
+    // Create new AbortController for this training request
+    trainingAbortController = new AbortController();
+
     // Show loading UI (main.js defines these globals)
     if (typeof loadingDiv !== 'undefined' && loadingDiv) loadingDiv.style.display = 'block';
     if (typeof loadingText !== 'undefined' && loadingText) loadingText.textContent = 'Preparing training...';
     if (typeof progressBar !== 'undefined' && progressBar) progressBar.style.width = '0%';
     if (typeof restoreSpinner === 'function') restoreSpinner();
+    
+    // Show cancel training button
+    const cancelTrainingBtn = document.getElementById('cancel-training-button');
+    if (cancelTrainingBtn) cancelTrainingBtn.style.display = 'inline-block';
+    
+    // Hide generate cancel button (if visible for any reason)
+    const cancelGenerateBtn = document.getElementById('cancel-generate-button');
+    if (cancelGenerateBtn) cancelGenerateBtn.style.display = 'none';
 
     fetch('/train', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: trainingAbortController.signal
     }).then(response => {
         if (!response.ok) {
             throw new Error('Train request failed: ' + response.statusText);
@@ -488,6 +541,14 @@ function startTraining(payload) {
                             case 'error':
                                 if (typeof showWarningImage === 'function') showWarningImage();
                                 showStatusMessage('Training error: ' + (jsonData.message || 'Unknown'), 'error');
+                                // Reset training state
+                                resetTrainingState();
+                                // Hide loading after showing error
+                                setTimeout(() => {
+                                    if (typeof loadingDiv !== 'undefined' && loadingDiv) {
+                                        loadingDiv.style.display = 'none';
+                                    }
+                                }, 2000);
                                 break;
                             case 'complete':
                                 // training finished; backend should include model_id
@@ -505,6 +566,8 @@ function startTraining(payload) {
                                 }
                                 // hide new model form
                                 hideNewModelForm();
+                                // Reset training state
+                                resetTrainingState();
                                 // hide loading after short pause to let user read
                                 setTimeout(() => {
                                     if (typeof loadingDiv !== 'undefined' && loadingDiv) loadingDiv.style.display = 'none';
@@ -524,8 +587,25 @@ function startTraining(payload) {
         return processStream();
     }).catch(err => {
         console.error('Training request failed:', err);
+        
+        // Reset training state
+        resetTrainingState();
+        
+        // Check if error was due to abort
+        if (err.name === 'AbortError') {
+            // User cancelled, don't show error message
+            return;
+        }
+        
         if (typeof showWarningImage === 'function') showWarningImage();
         showStatusMessage('Training failed: ' + err.message, 'error');
+        
+        // Hide loading bar after showing error
+        setTimeout(() => {
+            if (typeof loadingDiv !== 'undefined' && loadingDiv) {
+                loadingDiv.style.display = 'none';
+            }
+        }, 2000);
     });
 }
 
