@@ -366,7 +366,7 @@ def stream_progress():
             prefix_text=prefix,
             length=length,
             temperature=temperature,
-            custom_names=custom_names if selected_model == 'custom' else None,
+            custom_names=custom_names if selected_model.startswith('custom') else None,
             length_mode=length_mode,
             user_id=user_id if selected_model.startswith('custom') else None
         )
