@@ -1,10 +1,10 @@
-# Fantasy Name Prospector
-Fantasy Name Prospector is a website that allows users to generate names based on language patterns.
+# Name Prospector
+Name Prospector is a website that allows users to generate names based on language patterns.
 The general idea is to generate names based on a certain learnable patterns in a set of names.  
 
 You can access the website at https://sapphire-infosystems.com/
 
-Fantasy Name Prospector is useful for many different purposes. Here is a just few of them:
+Name Prospector is useful for many different purposes. Here is a just few of them:
 * Generating fantasy names that have a certain cultural "vibe"
 * Generating fresh, new, baby names that match the constraints of a certain language
 * Learning how certain patterns appear and repeat in languages 
