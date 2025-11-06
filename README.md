@@ -2,7 +2,7 @@
 Name Prospector is a website that allows users to generate names based on language patterns.
 The general idea is to generate names based on a certain learnable patterns in a set of names.  
 
-You can access the website at https://sapphire-infosystems.com/
+You can access the website at https://nameprospector.sapphire-infosystems.com/
 
 Name Prospector is useful for many different purposes. Here is a just few of them:
 * Generating fantasy names that have a certain cultural "vibe"
