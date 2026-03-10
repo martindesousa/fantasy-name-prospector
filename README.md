@@ -14,28 +14,38 @@ Name Prospector is useful for many different purposes. Here is a just few of the
 ### Creating a Model
 
 There are two ways to create a model:
-* The first option is to run the manual_model_builder.py file, using a text file.
-* The second option is to use the website feature "Input Your Own Names".   
+* The first option is to run the manual_model_builder.py file, using a text file filled with names of the format:
+    <M> MaleName1
+    <F> FemaleName1
+    <M> MaleName2
+    <M> MaleName3
+    <F> FemaleName2
+    <N> NeutralName1
+    ... and so on in any order of males, females, or neutrals. 
+* The second option is to use the website feature "Custom Models", and click "Create New".   
 
 ### List of Existing Models
 
 The website currently has these pretrained models that can be used to generate names:
-* Classic American
-* New Age American
+* American (Classic)
+* American (Modern)
 * French
 * German
-* Chinese
+* Chinese (Mandarin)
 * Greek
+* Roman
 * Russian
 * Arabic
 * Aztec
+* Mande
 * Spanish
 * Japanese 
 * Tamil
+* Turkish
 
 These models are not currently available but are high priority:
 * English
-* Roman
+* Norse
 * Thai
 * Hawaiian
 
@@ -44,4 +54,4 @@ The language patterns are learned by an LSTM-based model that is trained to lear
 Name generation is tinkered by many generation parameters, many of which the user controls, such as Gender, Temperature, Prefix, and Length. There are also other parameters controlling penalties on ending trigrams, hyphens, and capital letters. 
 
 ### Sources:
-Names in the text files including French, Greek, Russian, Arabic, Aztec, Spanish, and Japanese are sourced from BabyNames.com, with each respective page being found at https://babynames.com/{language}-baby-names.
+Names in the text files including French, Greek, Russian, Arabic, Aztec, Spanish, and Japanese are sourced from BabyNames.com, with each respective page being found at https://babynames.com/{language}-baby-names. The list of all language/ethnic-based names is here: https://babynames.com/baby-names-by-origin.php.
