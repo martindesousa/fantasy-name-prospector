@@ -5,14 +5,13 @@
     const selectedMeta = document.getElementById('template-selected-meta');
     const browser = document.getElementById('template-browser');
     const openButton = document.getElementById('open-template-browser');
-    const closeButton = document.getElementById('close-template-browser');
     const searchInput = document.getElementById('template-model-search');
     const clearButton = document.getElementById('clear-template-search');
     const status = document.getElementById('template-browser-status');
     const results = document.getElementById('template-browser-results');
     const emptyState = document.getElementById('template-browser-empty');
 
-    if (!select || !selectedPanel || !selectedName || !selectedMeta || !browser || !openButton || !closeButton || !searchInput || !clearButton || !status || !results || !emptyState) {
+    if (!select || !selectedPanel || !selectedName || !selectedMeta || !browser || !openButton || !searchInput || !clearButton || !status || !results || !emptyState) {
         return;
     }
 
@@ -181,10 +180,6 @@
 
     openButton.addEventListener('click', function () {
         setBrowserVisibility(browser.hidden);
-    });
-
-    closeButton.addEventListener('click', function () {
-        setBrowserVisibility(false);
     });
 
     searchInput.addEventListener('input', function () {

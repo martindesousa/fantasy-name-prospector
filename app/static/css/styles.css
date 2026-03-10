@@ -302,7 +302,6 @@ body {
 
     .template-browser-searchbar .form-control,
     .template-browser-clear,
-    .template-browser-close,
     .template-browser-toggle {
         width: 100%;
     }
@@ -458,8 +457,7 @@ body {
     padding-left: 2.45rem;
 }
 
-.template-browser-clear,
-.template-browser-close {
+.template-browser-clear {
     flex-shrink: 0;
 }
 

@@ -68,9 +68,6 @@
                                                 <div>
                                                     <div class="template-browser-title">Browse Templates</div>
                                                 </div>
-                                                <button type="button" class="btn btn-outline-secondary btn-sm template-browser-close" id="close-template-browser">
-                                                    Close
-                                                </button>
                                             </div>
 
                                             <div class="template-browser-searchbar">
@@ -235,7 +232,7 @@
                     <input type="hidden" id="selected-custom-model" name="selected_custom_model" value="">
 
                     <!-- Parameters Row -->
-                    <div class="row mb-4">
+                    <div class="row mb-2">
                         <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
                             <label for="gender" class="form-label">Gender
                                 <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
@@ -248,7 +245,7 @@
                                 <option value="male">Male</option>
                             </select>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
                             <label for="temperature" class="form-label">Temperature
                                 <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
                                    data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
@@ -258,11 +255,11 @@
                                    placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" value="1.0" required>
                         <div id="temperature-note" class="form-text text-warning" style="display:none;">Note: temperature=0 will give a deterministic output (it will only produce one distinct result).</div>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                        <div class="col-lg-4 col-md-4 col-sm-6 mb-3">
                             <label for="prefix" class="form-label">Prefix <span class="text-muted">(Optional)</span>
                                 <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
                                    data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
-                                   title="Determines starting characters in generated names.<br> It must not exceed any specified length."></i>
+                                   title="Determines starting characters in generated names.<br> If using Custom Length, prefix must not exceed the length specified in the length field."></i>
                             </label>
                             <input type="text" id="prefix" name="prefix" class="form-control" 
                                    placeholder="A, Aa, Aaa...">
@@ -283,8 +280,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="row mb-4">
-                        <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                    <div class="row mb-2">
+                        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
                             <label for="count" class="form-label">Count
                                 <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
                                    data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
