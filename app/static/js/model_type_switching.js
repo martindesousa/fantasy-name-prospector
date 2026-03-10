@@ -78,6 +78,7 @@
                 }
                 const modelSelectEl3 = document.getElementById('model');
                 if (modelSelectEl3) modelSelectEl3.value = lastTemplateModel;
+                if (modelSelectEl3) modelSelectEl3.dispatchEvent(new Event('change', { bubbles: true }));
                 if (modelSelectEl3 && modelSelectEl3.value !== 'custom') {
                     const customNamesContainer2 = document.getElementById('custom-names-input') || document.getElementById('custom-names-container');
                     const customNotice2 = document.getElementById('custom-notice');

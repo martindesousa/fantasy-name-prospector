@@ -49,37 +49,66 @@
                         <!-- Template Tab -->
                         <div id="template-tab" class="tab-pane active">
                             <div class="row">
-                                <div class="col-md-8">
-                                    <label for="model" class="form-label">Select a Model</label>
-                                    <select id="model" name="model" class="form-select">
-                                        <option value="american_classic">American (Classic)</option>
-                                        <option value="american_new_age">American (Modern)</option>
-                                        <option value="arabic">Arabic</option>
-                                        <option value="aztec">Aztec</option>
-                                        <option value="chinese">Chinese (Mandarin)</option>
-                                        <option value="french">French</option>
-                                        <option value="german">German</option>
-                                        <option value="greek">Greek</option>
-                                        <option value="japanese">Japanese</option>
-                                        <option value="mande">Mande</option>
-                                        <option value="roman">Roman</option>
-                                        <option value="russian">Russian</option>
-                                        <option value="spanish">Spanish</option>
-                                        <option value="tamil">Tamil</option>
-                                        <option value="turkish">Turkish</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="gender" class="form-label">Gender
-                                        <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
-                                           data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
-                                           title="Determines the gender to use for the generated names. Since models don't interpret gender strictly, this is more of a guideline — it provides a token at the start to nudge the model toward typical patterns for that gender."></i>
-                                    </label>
-                                    <select id="gender" name="gender" class="form-select">
-                                        <option value="neutral" selected>Neutral</option>
-                                        <option value="female">Female</option>
-                                        <option value="male">Male</option>
-                                    </select>
+                                <div class="col-12">
+                                    <label for="open-template-browser" class="form-label">Template Model</label>
+                                    <div class="template-picker-shell" id="template-picker-shell">
+                                        <div class="template-selected-panel" id="template-selected-panel" aria-live="polite">
+                                            <div class="template-selected-copy">
+                                                <div class="template-selected-label">Selected template</div>
+                                                <div class="template-selected-name" id="template-selected-name">American (Classic)</div>
+                                                <div class="template-selected-meta" id="template-selected-meta">Human Cultures | North American</div>
+                                            </div>
+                                            <button type="button" class="btn btn-outline-secondary template-browser-toggle" id="open-template-browser">
+                                                Browse Templates
+                                            </button>
+                                        </div>
+
+                                        <div class="template-browser" id="template-browser" hidden>
+                                            <div class="template-browser-header">
+                                                <div>
+                                                    <div class="template-browser-title">Browse Templates</div>
+                                                </div>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm template-browser-close" id="close-template-browser">
+                                                    Close
+                                                </button>
+                                            </div>
+
+                                            <div class="template-browser-searchbar">
+                                                <i class="bi bi-search template-browser-search-icon" aria-hidden="true"></i>
+                                                <input type="search" id="template-model-search" class="form-control" placeholder="Search by model, group, or theme">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm template-browser-clear" id="clear-template-search" hidden>
+                                                    Clear
+                                                </button>
+                                            </div>
+
+                                            <div class="template-browser-status" id="template-browser-status">15 models available</div>
+
+                                            <div class="template-browser-results" id="template-browser-results"></div>
+                                            <div class="template-browser-empty" id="template-browser-empty" hidden>
+                                                <i class="bi bi-binoculars"></i>
+                                                <div class="template-browser-empty-title">No templates matched that search</div>
+                                                <p>Try a broader term like Romance, Slavic, East Asian, or classical.</p>
+                                            </div>
+                                        </div>
+
+                                        <select id="model" name="model" class="form-select visually-hidden" aria-hidden="true" tabindex="-1">
+                                            <option value="american_classic" data-type="Human Cultures" data-group="North American" data-description="Classic American given names with older Anglo-American patterns and familiar historical usage.">American (Classic)</option>
+                                            <option value="american_new_age" data-type="Human Cultures" data-group="North American" data-description="Modern American-style names with newer spellings, softer sounds, and contemporary naming trends.">American (Modern)</option>
+                                            <option value="arabic" data-type="Human Cultures" data-group="Semitic" data-description="Arabic personal names shaped by Semitic sound patterns and widely recognized Arabic naming traditions.">Arabic</option>
+                                            <option value="aztec" data-type="Human Cultures" data-group="Mesoamerican" data-description="Aztec and Nahua-inspired names suited to pre-Columbian, mythic, or historical Mesoamerican settings.">Aztec</option>
+                                            <option value="chinese" data-type="Human Cultures" data-group="Chinese" data-description="Mandarin Chinese-style names with concise syllabic structure and familiar Han naming rhythms.">Chinese (Mandarin)</option>
+                                            <option value="french" data-type="Human Cultures" data-group="Romance" data-description="French personal names with Romance-language cadence, softer endings, and continental European feel.">French</option>
+                                            <option value="german" data-type="Human Cultures" data-group="Germanic" data-description="German names with firmer consonants, Germanic roots, and a more structured European sound.">German</option>
+                                            <option value="greek" data-type="Human Cultures" data-group="Greek" data-description="Greek-inspired names that fit Hellenic, classical, or Mediterranean-flavored character lineages.">Greek</option>
+                                            <option value="japanese" data-type="Human Cultures" data-group="East Asian" data-description="Japanese-style names with compact mora-like rhythm and phonetic patterns familiar to modern Japanese naming.">Japanese</option>
+                                            <option value="mande" data-type="Human Cultures" data-group="West African" data-description="Mande-inspired names reflecting West African ethnolinguistic traditions and regional naming sounds.">Mande</option>
+                                            <option value="roman" data-type="Human Cultures" data-group="Romance" data-description="Roman and Latin-style names suited to imperial, classical, or historically grounded Mediterranean settings.">Roman</option>
+                                            <option value="russian" data-type="Human Cultures" data-group="Slavic" data-description="Russian-style names with Slavic phonetics, strong consonant clusters, and Eastern European character.">Russian</option>
+                                            <option value="spanish" data-type="Human Cultures" data-group="Romance" data-description="Spanish names with Iberian Romance flow, recognizable vowel patterns, and broad historical familiarity.">Spanish</option>
+                                            <option value="tamil" data-type="Human Cultures" data-group="South Asian" data-description="Tamil-inspired names with Dravidian sound patterns and a clear South Asian linguistic character.">Tamil</option>
+                                            <option value="turkish" data-type="Human Cultures" data-group="Turkic" data-description="Turkish-style names blending Turkic phonetics with Anatolian influences for a distinct regional sound.">Turkish</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -207,7 +236,19 @@
 
                     <!-- Parameters Row -->
                     <div class="row mb-4">
-                        <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                            <label for="gender" class="form-label">Gender
+                                <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
+                                   data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
+                                   title="Determines the gender to use for the generated names. Since models don't interpret gender strictly, this is more of a guideline — it provides a token at the start to nudge the model toward typical patterns for that gender."></i>
+                            </label>
+                            <select id="gender" name="gender" class="form-select">
+                                <option value="neutral" selected>Neutral</option>
+                                <option value="female">Female</option>
+                                <option value="male">Male</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                             <label for="temperature" class="form-label">Temperature
                                 <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
                                    data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
@@ -217,7 +258,7 @@
                                    placeholder="0.0 - 5.0" min="0.0" max="5.0" step="0.1" value="1.0" required>
                         <div id="temperature-note" class="form-text text-warning" style="display:none;">Note: temperature=0 will give a deterministic output (it will only produce one distinct result).</div>
                         </div>
-                        <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                             <label for="prefix" class="form-label">Prefix <span class="text-muted">(Optional)</span>
                                 <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
                                    data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
@@ -226,27 +267,24 @@
                             <input type="text" id="prefix" name="prefix" class="form-control" 
                                    placeholder="A, Aa, Aaa...">
                         </div>
-                        <div class="col-md-3 col-sm-6 mb-3">
-                            <label for="length_mode" class="form-label">Length Mode
+                        <div class="col-lg-4 col-md-6 col-sm-12 mb-3">
+                            <label for="length_mode" class="form-label">Length
                                 <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
                                    data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
-                                   title="Options for how to determine length.<br> &#8226; Auto: model chooses length<br>&#8226; Average: only use dataset average length<br>&#8226; Custom: you specify exact length"></i>
+                                   title="Choose how name length is determined.<br>&#8226; Auto lets the model decide<br>&#8226; Average uses the dataset average<br>&#8226; Custom enables a manual length value in the box to the right"></i>
                             </label>
-                            <select id="length_mode" name="length_mode" class="form-select">
-                                <option value="auto" selected>Auto</option>
-                                <option value="average">Average</option>
-                                <option value="custom">Custom</option>
-                            </select>
+                            <div class="compact-length-group">
+                                <select id="length_mode" name="length_mode" class="form-select" aria-label="Length mode">
+                                    <option value="auto" selected>Auto</option>
+                                    <option value="average">Average</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                                <input type="text" id="length" class="form-control" placeholder="automatic" aria-label="Length value" disabled>
+                            </div>
                         </div>
-                        <div class="col-md-3 col-sm-6 mb-3">
-                            <label for="length" class="form-label">Length
-                                <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
-                                   data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
-                                   title="&#8226; Input length here if using Length Mode = 'Custom'. Disabled for Auto and Average modes."></i>
-                            </label>
-                            <input type="text" id="length" class="form-control" placeholder="automatic" disabled>
-                        </div>
-                        <div class="col-md-3 col-sm-6 mb-3">
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                             <label for="count" class="form-label">Count
                                 <i class="bi bi-info-circle ms-1 text-muted" role="button" tabindex="0"
                                    data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true"
@@ -304,6 +342,7 @@
     <script src="{{ url_for('static', filename='js/toast.js') }}" ></script>
     <script src="{{ url_for('static', filename='js/results.js') }}" ></script>
     <script src="{{ url_for('static', filename='js/main.js') }}" ></script>
+    <script src="{{ url_for('static', filename='js/template_model_picker.js') }}" ></script>
     <script src="{{ url_for('static', filename='js/custom_models.js') }}" ></script>
     <script src="{{ url_for('static', filename='js/model_type_switching.js') }}" ></script>
 </body>
