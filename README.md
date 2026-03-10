@@ -44,4 +44,4 @@ The language patterns are learned by an LSTM-based model that is trained to lear
 Name generation is tinkered by many generation parameters, many of which the user controls, such as Gender, Temperature, Prefix, and Length. There are also other parameters controlling penalties on ending trigrams, hyphens, and capital letters. 
 
 ### Sources:
-Names in the text files including French, Greek, Russian, Arabic, Aztec, Spanish, and Japanese are sourced from BabyNames.com, with each respective page being found at https://babynames.com/{language}-baby-names.
+Names in the text files including French, Greek, Russian, Arabic, Aztec, Spanish, and Japanese are sourced from BabyNames.com, with each respective page being found at https://babynames.com/{language}-baby-names. The list of all languages is here: https://babynames.com/baby-names-by-origin.php.
